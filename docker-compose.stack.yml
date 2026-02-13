@@ -236,7 +236,6 @@ services:
   # =========================
   kafka-01:
     image: confluentinc/cp-kafka:7.4.0
-    hostname: kafka-01
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 1
@@ -269,7 +268,9 @@ services:
       - kafka01_data:/var/lib/kafka/data
       - kafka01_metadata:/var/lib/kafka/metadata
     networks:
-      - oracle-network
+      oracle-network:
+        aliases:
+          - kafka-01
     user: "0"
     entrypoint:
       [
@@ -306,7 +307,6 @@ services:
 
   kafka-02:
     image: confluentinc/cp-kafka:7.4.0
-    hostname: kafka-02
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 2
@@ -338,7 +338,9 @@ services:
       - kafka02_data:/var/lib/kafka/data
       - kafka02_metadata:/var/lib/kafka/metadata
     networks:
-      - oracle-network
+      oracle-network:
+        aliases:
+          - kafka-02
     user: "0"
     entrypoint:
       [
@@ -375,7 +377,6 @@ services:
 
   kafka-03:
     image: confluentinc/cp-kafka:7.4.0
-    hostname: kafka-03
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 3
@@ -407,7 +408,9 @@ services:
       - kafka03_data:/var/lib/kafka/data
       - kafka03_metadata:/var/lib/kafka/metadata
     networks:
-      - oracle-network
+      oracle-network:
+        aliases:
+          - kafka-03
     user: "0"
     entrypoint:
       [
