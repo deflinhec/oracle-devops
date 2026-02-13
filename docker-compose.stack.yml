@@ -239,13 +239,13 @@ services:
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 1
-      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-01:9093,2@kafka-02:9093,3@kafka-03:9093"
+      KAFKA_CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka-01:9093,2@tasks.kafka-02:9093,3@tasks.kafka-03:9093"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-01:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka-01:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
       # Production-ish defaults for 3-broker cluster
@@ -268,9 +268,7 @@ services:
       - kafka01_data:/var/lib/kafka/data
       - kafka01_metadata:/var/lib/kafka/metadata
     networks:
-      oracle-network:
-        aliases:
-          - kafka-01
+      - oracle-network
     user: "0"
     entrypoint:
       [
@@ -310,13 +308,13 @@ services:
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 2
-      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-01:9093,2@kafka-02:9093,3@kafka-03:9093"
+      KAFKA_CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka-01:9093,2@tasks.kafka-02:9093,3@tasks.kafka-03:9093"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-02:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka-02:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
@@ -338,9 +336,7 @@ services:
       - kafka02_data:/var/lib/kafka/data
       - kafka02_metadata:/var/lib/kafka/metadata
     networks:
-      oracle-network:
-        aliases:
-          - kafka-02
+      - oracle-network
     user: "0"
     entrypoint:
       [
@@ -380,13 +376,13 @@ services:
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 3
-      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-01:9093,2@kafka-02:9093,3@kafka-03:9093"
+      KAFKA_CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka-01:9093,2@tasks.kafka-02:9093,3@tasks.kafka-03:9093"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-03:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka-03:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
@@ -408,9 +404,7 @@ services:
       - kafka03_data:/var/lib/kafka/data
       - kafka03_metadata:/var/lib/kafka/metadata
     networks:
-      oracle-network:
-        aliases:
-          - kafka-03
+      - oracle-network
     user: "0"
     entrypoint:
       [
@@ -457,7 +451,7 @@ services:
         mode: ingress
     environment:
       TZ: Asia/Taipei
-      BOOTSTRAP_SERVERS: kafka-01:9092,kafka-02:9092,kafka-03:9092
+      BOOTSTRAP_SERVERS: tasks.kafka-01:9092,tasks.kafka-02:9092,tasks.kafka-03:9092
       GROUP_ID: oracle-connect-cluster
       CONFIG_STORAGE_TOPIC: connect-configs
       OFFSET_STORAGE_TOPIC: connect-offsets
