@@ -445,7 +445,7 @@ services:
   # Oracle API service (server)
   # =========================
   api:
-    image: ${IMAGE_REGISTRY}oracle/app:master
+    image: ${IMAGE_REGISTRY}oracle/app:develop
     command: server
     configs:
       - source: oracle_config
@@ -487,7 +487,7 @@ services:
   # Kafka Consumer service
   # =========================
   consumer:
-    image: ${IMAGE_REGISTRY}oracle/app:master
+    image: ${IMAGE_REGISTRY}oracle/app:develop
     command: consumer
     configs:
       - source: oracle_config
@@ -517,7 +517,7 @@ services:
   # Scheduler service
   # =========================
   scheduler:
-    image: ${IMAGE_REGISTRY}oracle/app:master
+    image: ${IMAGE_REGISTRY}oracle/app:develop
     command: scheduler
     configs:
       - source: oracle_config
