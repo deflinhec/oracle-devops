@@ -1,0 +1,590 @@
+version: "3.8"
+
+# Docker Swarm Stack (PRD) - node label placement + Docker Config/Secret for app config
+#
+# Node label plan:
+#   role=manager   : HAProxy / Swarm management
+#   role=api       : API service
+#   role=scheduler : Scheduler service
+#   role=consumer  : Consumer service
+#   role=db        : MariaDB
+#   role=cache     : Redis
+#   role=mq        : Kafka / Kafka Connect
+#   role=olap      : ClickHouse
+#   role=docdb     : MongoDB
+#
+# Kafka (KRaft) plan:
+#   - 3 brokers: kafka-01 / kafka-02 / kafka-03
+#   - Each broker is a dedicated service with fixed NODE_ID and pinned to a specific host.
+
+services:
+  # =========================
+  # Database: MariaDB
+  # =========================
+  mariadb:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: root_password
+      MARIADB_DATABASE: oracle_db
+      MARIADB_USER: oracle
+      MARIADB_PASSWORD: oracle_password
+      TZ: Asia/Taipei
+    ports:
+      - target: 3306
+        published: 3306
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-connections=1000
+      - --innodb_flush_log_at_trx_commit=1
+      - --sync_binlog=1
+    networks:
+      - oracle-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.db=master <node_id>
+          - node.labels.role.db == master
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =========================
+  # Cache: Redis
+  # =========================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - target: 6379
+        published: 6379
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - redis_data:/data
+    networks:
+      - oracle-network
+    command: ["redis-server", "--appendonly", "yes"]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.cache=true <node_id>
+          - node.labels.role.cache == true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =========================
+  # Document DB: MongoDB
+  # =========================
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - target: 27017
+        published: 27017
+        protocol: tcp
+        mode: ingress
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: oracle
+      MONGO_INITDB_ROOT_PASSWORD: oracle_password
+      MONGO_INITDB_DATABASE: oracle_mdb
+      TZ: Asia/Taipei
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - oracle-network
+    command: ["mongod", "--auth"]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.mdb=true <node_id>
+          - node.labels.role.mdb == true
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =========================
+  # MQ: Kafka (KRaft 3 brokers)
+  # =========================
+  kafka-01:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka-01
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-01:9093,2@kafka-02:9093,3@kafka-03:9093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-01:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # Production-ish defaults for 3-broker cluster
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_CLEANUP_POLICY: delete
+
+      KAFKA_METADATA_LOG_DIR: /var/lib/kafka/metadata
+      TZ: Asia/Taipei
+    volumes:
+      - kafka01_data:/var/lib/kafka/data
+      - kafka01_metadata:/var/lib/kafka/metadata
+    networks:
+      - oracle-network
+    user: "0"
+    entrypoint:
+      [
+        "/bin/bash",
+        "-c",
+        "/etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...' && su appuser -s /bin/bash -c 'kafka-storage format -t Y1LZj0gBQ4u2GsAHmcHGww -c /etc/kafka/kafka.properties --ignore-formatted' && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi && exec /etc/confluent/docker/run"
+      ]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.kafka=1 <node_id>
+          - node.labels.role.kafka == 1
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+
+  kafka-02:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka-02
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 2
+      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-01:9093,2@kafka-02:9093,3@kafka-03:9093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-02:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_CLEANUP_POLICY: delete
+
+      KAFKA_METADATA_LOG_DIR: /var/lib/kafka/metadata
+      TZ: Asia/Taipei
+    volumes:
+      - kafka02_data:/var/lib/kafka/data
+      - kafka02_metadata:/var/lib/kafka/metadata
+    networks:
+      - oracle-network
+    user: "0"
+    entrypoint:
+      [
+        "/bin/bash",
+        "-c",
+        "/etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...' && su appuser -s /bin/bash -c 'kafka-storage format -t Y1LZj0gBQ4u2GsAHmcHGww -c /etc/kafka/kafka.properties --ignore-formatted' && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi && exec /etc/confluent/docker/run"
+      ]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.kafka=2 <node_id>
+          - node.labels.role.kafka == 2
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+
+  kafka-03:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka-03
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 3
+      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-01:9093,2@kafka-02:9093,3@kafka-03:9093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-03:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_CLEANUP_POLICY: delete
+
+      KAFKA_METADATA_LOG_DIR: /var/lib/kafka/metadata
+      TZ: Asia/Taipei
+    volumes:
+      - kafka03_data:/var/lib/kafka/data
+      - kafka03_metadata:/var/lib/kafka/metadata
+    networks:
+      - oracle-network
+    user: "0"
+    entrypoint:
+      [
+        "/bin/bash",
+        "-c",
+        "/etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...' && su appuser -s /bin/bash -c 'kafka-storage format -t Y1LZj0gBQ4u2GsAHmcHGww -c /etc/kafka/kafka.properties --ignore-formatted' && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi && exec /etc/confluent/docker/run"
+      ]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.kafka=3 <node_id>
+          - node.labels.role.kafka == 3
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+
+  # =========================
+  # Kafka Connect (Debezium)
+  # =========================
+  kafka-connect:
+    image: ${REGISTRY}/kafka-connect:latest
+    ports:
+      - target: 8083
+        published: 8083
+        protocol: tcp
+        mode: ingress
+    environment:
+      TZ: Asia/Taipei
+      BOOTSTRAP_SERVERS: kafka-01:9092,kafka-02:9092,kafka-03:9092
+      GROUP_ID: oracle-connect-cluster
+      CONFIG_STORAGE_TOPIC: connect-configs
+      OFFSET_STORAGE_TOPIC: connect-offsets
+      STATUS_STORAGE_TOPIC: connect-status
+      KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      KAFKA_CONNECT_PLUGINS_DIR: /kafka/connect,/kafka/connect/plugins
+    networks:
+      - oracle-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.mq=true <node_id>
+          - node.labels.role.cdc == true
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8083/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =========================
+  # OLAP: ClickHouse
+  # =========================
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.11
+    ports:
+      - target: 8123
+        published: 8123
+        protocol: tcp
+        mode: ingress
+      - target: 9000
+        published: 9000
+        protocol: tcp
+        mode: ingress
+    environment:
+      CLICKHOUSE_DB: oracle_analytics
+      CLICKHOUSE_USER: oracle
+      CLICKHOUSE_PASSWORD: oracle_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      TZ: Asia/Taipei
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - oracle-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.olap=true <node_id>
+          - node.labels.role.olap == true
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  # =========================
+  # Oracle API service (server)
+  # =========================
+  api:
+    image: ${REGISTRY}/kafka-connect:latest
+    command: server
+    configs:
+      - source: oracle_config_yaml
+        target: /app/deploy/config.yaml
+        mode: 0444
+    networks:
+      - oracle-network
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 0s
+        failure_action: pause
+        order: stop-first
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.api=true <node_id>
+          - node.labels.role.api == true
+        preferences:
+          - spread: node.labels.zone
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:7350/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =========================
+  # Nginx Load Balancer
+  # =========================
+  nginx:
+    image: nginx:1.26-alpine
+    ports:
+      - target: 7351
+        published: 80
+        protocol: tcp
+        mode: ingress
+    configs:
+      - source: nginx_swarm_cfg
+        target: /etc/nginx/nginx.conf
+        mode: 0444
+    networks:
+      - oracle-network
+    volumes:
+      - /var/www:/var/www
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.web=true <node_id>
+          - node.labels.role.web == true
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:7351/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # =========================
+  # Kafka Consumer service
+  # =========================
+  consumer:
+    image: ${REGISTRY}/oracle/app:latest
+    command: consumer
+    configs:
+      - source: oracle_config_yaml
+        target: /app/deploy/config.yaml
+        mode: 0444
+    networks:
+      - oracle-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.consumer=true <node_id>
+          - node.labels.role.consumer == true
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[c]onsumer' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # =========================
+  # Scheduler service
+  # =========================
+  scheduler:
+    image: ${REGISTRY}/oracle/app:latest
+    command: scheduler
+    configs:
+      - source: oracle_config_yaml
+        target: /app/deploy/config.yaml
+        mode: 0444
+    networks:
+      - oracle-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.scheduler=true <node_id>
+          - node.labels.role.scheduler == true
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[s]cheduler' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  oracle-network:
+    driver: overlay
+    attachable: true
+
+configs:
+  oracle_config_yaml:
+    file: ./deploy/config.yaml
+  haproxy_swarm_cfg:
+    file: ./docker/swarm/haproxy.cfg
+
+secrets:
+  db_password:
+    external: true
+  mongo_password:
+    external: true
+  jwt_secret:
+    external: true
+
+volumes:
+  mariadb_data:
+    driver: local
+  redis_data:
+    driver: local
+  mongodb_data:
+    driver: local
+
+  kafka01_data:
+    driver: local
+  kafka01_metadata:
+    driver: local
+  kafka02_data:
+    driver: local
+  kafka02_metadata:
+    driver: local
+  kafka03_data:
+    driver: local
+  kafka03_metadata:
+    driver: local
+
+  clickhouse_data:
+    driver: local
+  haproxy_stats:
+    driver: local
+
