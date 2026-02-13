@@ -625,7 +625,7 @@ configs:
   nginx_config:
     file: ./config/nginx/oracle.conf
   oracle_config:
-    file: ./deploy/config.yaml
+    file: ./config.yaml
 
 volumes:
   mariadb_data:
