@@ -56,7 +56,7 @@ docker node update --label-add zone=zone-a           $NODE_ID   # 可選，供 A
 
 ```bash
 # 使用 stack 檔部署，stack 名稱可自訂（例如 oracle）
-docker stack deploy oracle
+docker stack deploy -c docker-compose.stack.yml oracle
 ```
 
 ### 五、查看服務狀態
