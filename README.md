@@ -41,16 +41,22 @@ docker node update --label-add role.scheduler=true   $NODE_ID
 docker node update --label-add zone=zone-a           $NODE_ID   # 可選，供 API 分散部署用
 ```
 
-### 三、準備設定檔（可選）
+### 三、準備設定檔
 
-- **應用設定**：stack 會掛載 `./deploy/config.yaml` 為 config，若專案中沒有此檔，請在 `deploy/` 下自行建立符合應用需求的 `config.yaml`，或修改 stack 中對應的 config 來源。
+- **應用設定**：stack 會掛載 `./deploy/config.yaml` 為 config。若專案中沒有此檔，可先設定好 `IMAGE_REGISTRY`（見下方環境變數），再執行應用映像產生預設設定並寫入 `deploy/config.yaml`：
+
+  ```bash
+  docker run -it --rm ${IMAGE_REGISTRY}/oracle/app:latest deploy config
+  ```
+
+  或自行在 `deploy/` 下建立 `config.yaml`，或修改 stack 中對應的 config 來源。
 - **環境變數**：可複製 `.env.example` 為 `.env`，並設定 `IMAGE_REGISTRY`（必填）及資料庫等變數（有預設值，可選）。
 
 ### 四、部署 Stack
 
 ```bash
 # 使用 stack 檔部署，stack 名稱可自訂（例如 oracle）
-docker stack deploy -c docker-compose.stack.yml oracle
+docker stack deploy oracle
 ```
 
 ### 五、查看服務狀態

@@ -176,6 +176,11 @@ services:
         "-c",
         "/etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...' && su appuser -s /bin/bash -c 'kafka-storage format -t Y1LZj0gBQ4u2GsAHmcHGww -c /etc/kafka/kafka.properties --ignore-formatted' && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi && exec /etc/confluent/docker/run"
       ]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       replicas: 1
       restart_policy:
@@ -187,6 +192,10 @@ services:
         constraints:
           # docker command: docker node update --label-add role.kafka=1 <node_id>
           - node.labels.role.kafka == 1
+      resources:
+        limits:
+          cpu: 1
+          memory: 4G
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 15s
@@ -236,6 +245,11 @@ services:
         "-c",
         "/etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...' && su appuser -s /bin/bash -c 'kafka-storage format -t Y1LZj0gBQ4u2GsAHmcHGww -c /etc/kafka/kafka.properties --ignore-formatted' && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi && exec /etc/confluent/docker/run"
       ]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       replicas: 1
       restart_policy:
@@ -247,6 +261,10 @@ services:
         constraints:
           # docker command: docker node update --label-add role.kafka=2 <node_id>
           - node.labels.role.kafka == 2
+      resources:
+        limits:
+          cpu: 1
+          memory: 4G
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 15s
@@ -296,6 +314,11 @@ services:
         "-c",
         "/etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...' && su appuser -s /bin/bash -c 'kafka-storage format -t Y1LZj0gBQ4u2GsAHmcHGww -c /etc/kafka/kafka.properties --ignore-formatted' && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi && exec /etc/confluent/docker/run"
       ]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       replicas: 1
       restart_policy:
@@ -307,6 +330,10 @@ services:
         constraints:
           # docker command: docker node update --label-add role.kafka=3 <node_id>
           - node.labels.role.kafka == 3
+      resources:
+        limits:
+          cpu: 1
+          memory: 4G
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 15s
@@ -335,8 +362,14 @@ services:
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       KAFKA_CONNECT_PLUGINS_DIR: /kafka/connect,/kafka/connect/plugins
+      HEAP_OPTS: "-Xms1g -Xmx3g"
     networks:
       - oracle-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       replicas: 1
       restart_policy:
@@ -348,6 +381,10 @@ services:
         constraints:
           # docker command: docker node update --label-add role.mq=true <node_id>
           - node.labels.role.cdc == true
+      resources:
+        limits:
+          cpu: 1
+          memory: 4G
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8083/"]
       interval: 15s
@@ -419,7 +456,7 @@ services:
     volumes:
       - /var/www:/var/www
     deploy:
-      replicas: 1
+      mode: global
       restart_policy:
         condition: on-failure
         delay: 5s
@@ -454,7 +491,7 @@ services:
     networks:
       - oracle-network
     deploy:
-      replicas: 2
+      mode: global
       restart_policy:
         condition: on-failure
         delay: 5s
@@ -474,8 +511,6 @@ services:
         constraints:
           # docker command: docker node update --label-add role.api=true <node_id>
           - node.labels.role.api == true
-        preferences:
-          - spread: node.labels.zone
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:7350/api/v1/health"]
       interval: 30s
@@ -554,14 +589,6 @@ configs:
   oracle_config:
     file: ./deploy/config.yaml
 
-secrets:
-  db_password:
-    external: true
-  mongo_password:
-    external: true
-  jwt_secret:
-    external: true
-
 volumes:
   mariadb_data:
     driver: local
@@ -584,7 +611,5 @@ volumes:
     driver: local
 
   clickhouse_data:
-    driver: local
-  haproxy_stats:
     driver: local
 
