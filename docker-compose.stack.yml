@@ -239,7 +239,7 @@ services:
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 1
-      KAFKA_CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka-01:9093,2@tasks.kafka-02:9093,3@tasks.kafka-03:9093"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
@@ -308,7 +308,7 @@ services:
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 2
-      KAFKA_CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka-01:9093,2@tasks.kafka-02:9093,3@tasks.kafka-03:9093"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
@@ -376,7 +376,7 @@ services:
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 3
-      KAFKA_CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka-01:9093,2@tasks.kafka-02:9093,3@tasks.kafka-03:9093"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
