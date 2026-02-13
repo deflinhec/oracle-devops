@@ -295,7 +295,7 @@ services:
           - node.labels.role.kafka == 1
       resources:
         limits:
-          cpu: 1
+          cpus: "1"
           memory: 4G
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
@@ -364,7 +364,7 @@ services:
           - node.labels.role.kafka == 2
       resources:
         limits:
-          cpu: 1
+          cpus: "1"
           memory: 4G
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
@@ -433,7 +433,7 @@ services:
           - node.labels.role.kafka == 3
       resources:
         limits:
-          cpu: 1
+          cpus: "1"
           memory: 4G
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
@@ -484,7 +484,7 @@ services:
           - node.labels.role.cdc == true
       resources:
         limits:
-          cpu: 1
+          cpus: "1"
           memory: 4G
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8083/"]
