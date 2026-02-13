@@ -1,0 +1,146 @@
+# Filebeat config for Oracle stack (filestream inputs for rotation-safe ingestion).
+# Application logs are ECS JSON from pkg/logger + go.elastic.co/ecszap
+# (fields: @timestamp, log.level, message, log.origin, log.logger, ecs.version, error.*).
+
+filebeat.inputs:
+  # Oracle app (ecszap ECS JSON)
+  - type: filestream
+    id: oracle-app
+    enabled: true
+    paths:
+      - /var/log/oracle/app.log
+      - /var/log/oracle/app.err.log
+      - /var/log/supervisor/oracle.app.log
+      - /var/log/supervisor/oracle.app.err.log
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      service: oracle-app
+    fields_under_root: true
+
+  # Oracle server (ecszap ECS JSON)
+  - type: filestream
+    id: oracle-server
+    enabled: true
+    paths:
+      - /var/log/oracle/server.log
+      - /var/log/oracle/server.err.log
+      - /var/log/supervisor/oracle.server.log
+      - /var/log/supervisor/oracle.server.err.log
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      service: oracle-server
+    fields_under_root: true
+
+  # Oracle scheduler (ecszap ECS JSON)
+  - type: filestream
+    id: oracle-scheduler
+    enabled: true
+    paths:
+      - /var/log/oracle/scheduler.log
+      - /var/log/oracle/scheduler.err.log
+      - /var/log/supervisor/oracle.scheduler.log
+      - /var/log/supervisor/oracle.scheduler.err.log
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      service: oracle-scheduler
+    fields_under_root: true
+
+  # Oracle consumer (ecszap ECS JSON)
+  - type: filestream
+    id: oracle-consumer
+    enabled: true
+    paths:
+      - /var/log/oracle/consumer.log
+      - /var/log/oracle/consumer.err.log
+      - /var/log/supervisor/oracle.consumer.log
+      - /var/log/supervisor/oracle.consumer.err.log
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      service: oracle-consumer
+    fields_under_root: true
+
+  # Docker container logs
+  # - type: container
+  #   enabled: true
+  #   paths:
+  #     - '/var/lib/docker/containers/*/*.log'
+  #   processors:
+  #     - add_docker_metadata:
+  #         host: "unix:///var/run/docker.sock"
+
+  # MySQL logs (plain text)
+  - type: filestream
+    id: mysql
+    enabled: true
+    paths:
+      - /var/log/oracle/mysql/*.log
+    fields:
+      service: mysql
+    fields_under_root: true
+
+  # Redis logs (plain text)
+  - type: filestream
+    id: redis
+    enabled: true
+    paths:
+      - /var/log/oracle/redis/*.log
+    fields:
+      service: redis
+    fields_under_root: true
+
+  # ClickHouse logs (plain text)
+  - type: filestream
+    id: clickhouse
+    enabled: true
+    paths:
+      - /var/log/oracle/clickhouse/*.log
+    fields:
+      service: clickhouse
+    fields_under_root: true
+
+  # Kafka logs (plain text)
+  - type: filestream
+    id: kafka
+    enabled: true
+    paths:
+      - /var/log/oracle/kafka/*.log
+    fields:
+      service: kafka
+    fields_under_root: true
+
+# Processors
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+
+# Output to Logstash
+output.logstash:
+  hosts: ["logstash:5044"]
+
+# Logging
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+# Monitoring
+monitoring.enabled: true
+monitoring.elasticsearch:
+  hosts: ["elasticsearch:9200"]
