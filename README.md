@@ -46,7 +46,7 @@ docker node update --label-add zone=zone-a           $NODE_ID   # 可選，供 A
 - **應用設定**：stack 會掛載 `./deploy/config.yaml` 為 config。若專案中沒有此檔，可先設定好 `IMAGE_REGISTRY`（見下方環境變數），再執行應用映像產生預設設定並寫入 `deploy/config.yaml`：
 
   ```bash
-  docker run -it --rm ${IMAGE_REGISTRY}/oracle/app:latest deploy config --stdout > config.yaml
+  docker run -it --rm ${IMAGE_REGISTRY}/oracle/app:develop deploy config --stdout > config.yaml
   ```
 
   或自行在 `deploy/` 下建立 `config.yaml`，或修改 stack 中對應的 config 來源。
