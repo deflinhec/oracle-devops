@@ -446,7 +446,7 @@ services:
   # Kafka Connect (Debezium)
   # =========================
   kafka-connect:
-    image: 480126395291.dkr.ecr.ap-east-1.amazonaws.com/v2/igaming/kafka-connect:develop
+    image: 480126395291.dkr.ecr.ap-east-1.amazonaws.com/v2/igaming/kafka-connect:latest
     ports:
       - target: 8083
         published: 8083
