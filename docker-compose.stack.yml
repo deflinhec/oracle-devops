@@ -14,7 +14,7 @@ version: "3.8"
 #   role=docdb     : MongoDB
 #
 # Kafka (KRaft) plan:
-#   - 3 brokers: kafka-01 / kafka-02 / kafka-03
+#   - 3 brokers: kafka01 / kafka02 / kafka03
 #   - Each broker is a dedicated service with fixed NODE_ID and pinned to a specific host.
 
 # =========================
@@ -39,11 +39,11 @@ x-oracle-services: &oracle-services
     REDIS_HOST: redis
     REDIS_PORT: 6379
     # Kafka brokers
-    KAFKA_BROKERS: kafka-01:9092,kafka-02:9092,kafka-03:9092
+    KAFKA_BROKERS: kafka01:9092,kafka02:9092,kafka03:9092
     # Kafka Connect
     KAFKA_CONNECT_URL: http://kafka-connect:8083
     KAFKA_CONNECT_SERVER_ID: 1
-    KAFKA_CONNECT_BROKERS: kafka-01:9092,kafka-02:9092,kafka-03:9092
+    KAFKA_CONNECT_BROKERS: kafka01:9092,kafka02:9092,kafka03:9092
     KAFKA_CONNECT_DATABASE_HOST: mariadb
     KAFKA_CONNECT_DATABASE_PORT: 3306
     KAFKA_CONNECT_DATABASE_USERNAME: ${MARIADB_USER:-oracle}
@@ -234,18 +234,18 @@ services:
   # =========================
   # MQ: Kafka (KRaft 3 brokers)
   # =========================
-  kafka-01:
+  kafka01:
     image: confluentinc/cp-kafka:7.4.0
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 1
       CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka-01:9093,2@tasks.kafka-02:9093,3@tasks.kafka-03:9093"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka01:9093,2@tasks.kafka02:9093,3@tasks.kafka03:9093"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka-01:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka01:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
       # Production-ish defaults for 3-broker cluster
@@ -303,18 +303,18 @@ services:
       retries: 8
       start_period: 60s
 
-  kafka-02:
+  kafka02:
     image: confluentinc/cp-kafka:7.4.0
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 2
       CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka-01:9093,2@tasks.kafka-02:9093,3@tasks.kafka-03:9093"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka01:9093,2@tasks.kafka02:9093,3@tasks.kafka03:9093"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka-02:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka02:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
@@ -371,18 +371,18 @@ services:
       retries: 8
       start_period: 60s
 
-  kafka-03:
+  kafka03:
     image: confluentinc/cp-kafka:7.4.0
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 3
       CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka-01:9093,2@tasks.kafka-02:9093,3@tasks.kafka-03:9093"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka01:9093,2@tasks.kafka02:9093,3@tasks.kafka03:9093"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka-03:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka03:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
@@ -451,7 +451,7 @@ services:
         mode: ingress
     environment:
       TZ: Asia/Taipei
-      BOOTSTRAP_SERVERS: tasks.kafka-01:9092,tasks.kafka-02:9092,tasks.kafka-03:9092
+      BOOTSTRAP_SERVERS: tasks.kafka01:9092,tasks.kafka02:9092,tasks.kafka03:9092
       GROUP_ID: oracle-connect-cluster
       CONFIG_STORAGE_TOPIC: connect-configs
       OFFSET_STORAGE_TOPIC: connect-offsets
