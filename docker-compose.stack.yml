@@ -122,7 +122,7 @@ x-kafka-services: &kafka-service
       /etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata
       && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata
       && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...'
-      && su appuser -s /bin/bash -c 'kafka-storage format -t ${CLUSTER_ID} -c /etc/kafka/kafka.properties --ignore-formatted'
+      && su appuser -s /bin/bash -c "kafka-storage format -t $${CLUSTER_ID} -c /etc/kafka/kafka.properties --ignore-formatted"
       && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi
       && exec /etc/confluent/docker/run
   logging:
