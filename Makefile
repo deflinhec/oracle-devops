@@ -176,12 +176,18 @@ config-update-mariadb:
 .PHONY: image-update
 # 更新 image
 image-update:
-	for svc in api consumer scheduler; do \
-		docker service update \
+	docker service update \
+			--image $(IMAGE_REGISTRY)oracle/app:$(VERSION) \
+			--with-registry-auth \
+			$(STACK_NAME)_consumer; \
+	docker service update \
+			--image $(IMAGE_REGISTRY)oracle/app:$(VERSION) \
+			--with-registry-auth \
+			$(STACK_NAME)_scheduler; \
+	docker service update \
 			--image $(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 			--update-order start-first \
 			--update-parallelism 1 \
 			--update-delay 10s \
 			--with-registry-auth \
-			$(STACK_NAME)_$$svc; \
-	done;
+			$(STACK_NAME)_api; \
