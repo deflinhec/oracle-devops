@@ -73,6 +73,72 @@ x-oracle-services: &oracle-services
       max-size: "10m"
       max-file: "3"
 
+# =========================
+# Kafka (KRaft) – shared template
+# =========================
+x-kafka-env: &kafka-env
+  KAFKA_PROCESS_ROLES: broker,controller
+  CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
+  KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka01:9093,2@kafka02:9093,3@kafka03:9093"
+  KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+  KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+  KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+  KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+  KAFKA_NUM_PARTITIONS: 3
+  KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+  KAFKA_MIN_INSYNC_REPLICAS: 2
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+  KAFKA_LOG_RETENTION_HOURS: 168
+  KAFKA_LOG_SEGMENT_BYTES: 1073741824
+  KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+  KAFKA_LOG_CLEANUP_POLICY: delete
+  KAFKA_METADATA_LOG_DIR: /var/lib/kafka/metadata
+  TZ: Asia/Taipei
+
+x-kafka-deploy: &kafka-deploy
+  replicas: 1
+  restart_policy:
+    condition: on-failure
+    delay: 5s
+    max_attempts: 3
+    window: 120s
+  resources:
+    limits:
+      cpus: "1"
+      memory: 4G
+
+x-kafka-services: &kafka-service
+  image: confluentinc/cp-kafka:7.4.0
+  user: "0"
+  networks:
+    - oracle-network
+  entrypoint:
+    - "/bin/bash"
+    - "-c"
+    - >-
+      /etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata
+      && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata
+      && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...'
+      && su appuser -s /bin/bash -c 'kafka-storage format -t ${CLUSTER_ID} -c /etc/kafka/kafka.properties --ignore-formatted'
+      && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi
+      && exec /etc/confluent/docker/run
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+  deploy:
+    <<: *kafka-deploy
+  healthcheck:
+    test: ["CMD", "nc", "-z", "localhost", "9092"]
+    interval: 15s
+    timeout: 5s
+    retries: 8
+    start_period: 60s
+
 services:
   # =========================
   # Database: MariaDB
@@ -235,209 +301,46 @@ services:
   # MQ: Kafka (KRaft 3 brokers)
   # =========================
   kafka01:
-    image: confluentinc/cp-kafka:7.4.0
+    <<: *kafka-service
     environment:
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_NODE_ID: 1
-      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka01:9093,2@tasks.kafka02:9093,3@tasks.kafka03:9093"
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka01:9092
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-      # Production-ish defaults for 3-broker cluster
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
-      KAFKA_NUM_PARTITIONS: 3
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
-      KAFKA_MIN_INSYNC_REPLICAS: 2
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
-
-      KAFKA_LOG_RETENTION_HOURS: 168
-      KAFKA_LOG_SEGMENT_BYTES: 1073741824
-      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
-      KAFKA_LOG_CLEANUP_POLICY: delete
-
-      KAFKA_METADATA_LOG_DIR: /var/lib/kafka/metadata
-      TZ: Asia/Taipei
+      <<: [*kafka-env, { KAFKA_NODE_ID: 1, KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://oracle_kafka01:9092 }]
     volumes:
       - kafka01_data:/var/lib/kafka/data
       - kafka01_metadata:/var/lib/kafka/metadata
-    networks:
-      - oracle-network
-    user: "0"
-    entrypoint:
-      [
-        "/bin/bash",
-        "-c",
-        "/etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...' && su appuser -s /bin/bash -c 'kafka-storage format -t Y1LZj0gBQ4u2GsAHmcHGww -c /etc/kafka/kafka.properties --ignore-formatted' && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi && exec /etc/confluent/docker/run"
-      ]
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+      <<: *kafka-deploy
       placement:
         constraints:
           # docker command: docker node update --label-add role.kafka=1 <node_id>
           - node.labels.role.kafka == 1
-      resources:
-        limits:
-          cpus: "1"
-          memory: 4G
-    healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
-      interval: 15s
-      timeout: 5s
-      retries: 8
-      start_period: 60s
 
   kafka02:
-    image: confluentinc/cp-kafka:7.4.0
+    <<: *kafka-service
     environment:
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_NODE_ID: 2
-      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka01:9093,2@tasks.kafka02:9093,3@tasks.kafka03:9093"
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka02:9092
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
-      KAFKA_NUM_PARTITIONS: 3
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
-      KAFKA_MIN_INSYNC_REPLICAS: 2
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
-
-      KAFKA_LOG_RETENTION_HOURS: 168
-      KAFKA_LOG_SEGMENT_BYTES: 1073741824
-      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
-      KAFKA_LOG_CLEANUP_POLICY: delete
-
-      KAFKA_METADATA_LOG_DIR: /var/lib/kafka/metadata
-      TZ: Asia/Taipei
+      <<: [*kafka-env, { KAFKA_NODE_ID: 2, KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://oracle_kafka02:9092 }]
     volumes:
       - kafka02_data:/var/lib/kafka/data
       - kafka02_metadata:/var/lib/kafka/metadata
-    networks:
-      - oracle-network
-    user: "0"
-    entrypoint:
-      [
-        "/bin/bash",
-        "-c",
-        "/etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...' && su appuser -s /bin/bash -c 'kafka-storage format -t Y1LZj0gBQ4u2GsAHmcHGww -c /etc/kafka/kafka.properties --ignore-formatted' && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi && exec /etc/confluent/docker/run"
-      ]
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+      <<: *kafka-deploy
       placement:
         constraints:
           # docker command: docker node update --label-add role.kafka=2 <node_id>
           - node.labels.role.kafka == 2
-      resources:
-        limits:
-          cpus: "1"
-          memory: 4G
-    healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
-      interval: 15s
-      timeout: 5s
-      retries: 8
-      start_period: 60s
 
   kafka03:
-    image: confluentinc/cp-kafka:7.4.0
+    <<: *kafka-service
     environment:
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_NODE_ID: 3
-      CLUSTER_ID: Y1LZj0gBQ4u2GsAHmcHGww
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@tasks.kafka01:9093,2@tasks.kafka02:9093,3@tasks.kafka03:9093"
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://tasks.kafka03:9092
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
-      KAFKA_NUM_PARTITIONS: 3
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
-      KAFKA_MIN_INSYNC_REPLICAS: 2
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
-
-      KAFKA_LOG_RETENTION_HOURS: 168
-      KAFKA_LOG_SEGMENT_BYTES: 1073741824
-      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
-      KAFKA_LOG_CLEANUP_POLICY: delete
-
-      KAFKA_METADATA_LOG_DIR: /var/lib/kafka/metadata
-      TZ: Asia/Taipei
+      <<: [*kafka-env, { KAFKA_NODE_ID: 3, KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://oracle_kafka03:9092 }]
     volumes:
       - kafka03_data:/var/lib/kafka/data
       - kafka03_metadata:/var/lib/kafka/metadata
-    networks:
-      - oracle-network
-    user: "0"
-    entrypoint:
-      [
-        "/bin/bash",
-        "-c",
-        "/etc/confluent/docker/configure && mkdir -p /var/lib/kafka/metadata && chown -R appuser:appuser /var/lib/kafka/metadata && chmod 755 /var/lib/kafka/metadata && if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then echo 'Formatting Kafka metadata directory...' && su appuser -s /bin/bash -c 'kafka-storage format -t Y1LZj0gBQ4u2GsAHmcHGww -c /etc/kafka/kafka.properties --ignore-formatted' && echo 'Metadata directory formatted'; else echo 'Metadata directory already formatted'; fi && exec /etc/confluent/docker/run"
-      ]
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+      <<: *kafka-deploy
       placement:
         constraints:
           # docker command: docker node update --label-add role.kafka=3 <node_id>
           - node.labels.role.kafka == 3
-      resources:
-        limits:
-          cpus: "1"
-          memory: 4G
-    healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
-      interval: 15s
-      timeout: 5s
-      retries: 8
-      start_period: 60s
 
   # =========================
   # Kafka Connect (Debezium)
@@ -451,7 +354,7 @@ services:
         mode: ingress
     environment:
       TZ: Asia/Taipei
-      BOOTSTRAP_SERVERS: tasks.kafka01:9092,tasks.kafka02:9092,tasks.kafka03:9092
+      BOOTSTRAP_SERVERS: kafka01:9092,kafka02:9092,kafka03:9092
       GROUP_ID: oracle-connect-cluster
       CONFIG_STORAGE_TOPIC: connect-configs
       OFFSET_STORAGE_TOPIC: connect-offsets
