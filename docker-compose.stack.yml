@@ -435,7 +435,7 @@ services:
           # docker command: docker node update --label-add role.web=true <node_id>
           - node.labels.role.web == true
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "http://localhost/health"]
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/80'"]
       interval: 10s
       timeout: 5s
       retries: 3
