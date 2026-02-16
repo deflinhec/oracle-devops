@@ -169,3 +169,19 @@ config-update-mariadb:
 	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/etc/mysql/conf.d/mariadb.cnf,mode=0444 $(STACK_NAME)_mariadb; \
 	echo "==> MariaDB 設定更新完成"
 
+########################################################
+# Image Update
+########################################################
+
+.PHONY: image-update
+# 更新 image
+image-update:
+	for svc in api consumer scheduler; do \
+		docker service update \
+			--image $(IMAGE_REGISTRY)oracle/app:$(VERSION) \
+			--update-order start-first \
+			--update-parallelism 1 \
+			--update-delay 10s \
+			--with-registry-auth \
+			$(STACK_NAME)_$$svc; \
+	done;
