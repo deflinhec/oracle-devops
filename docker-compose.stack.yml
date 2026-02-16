@@ -390,7 +390,7 @@ services:
           cpus: "2"
           memory: 6G
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8083/"]
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:8083/connector-plugins"]
       interval: 20s
       timeout: 10s
       retries: 10
