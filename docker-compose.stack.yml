@@ -158,6 +158,10 @@ services:
         mode: ingress
     volumes:
       - mariadb_data:/var/lib/mysql
+    configs:
+      - source: mariadb_config
+        target: /etc/mysql/conf.d/mariadb.cnf
+        mode: 0444
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -529,6 +533,8 @@ configs:
     file: ./config/nginx/oracle.conf
   oracle_config:
     file: ./deploy/config.yaml
+  mariadb_config:
+    file: ./config/mariadb/mariadb.cnf
 
 volumes:
   mariadb_data:

@@ -1,0 +1,4 @@
+[mysqld]
+log-bin=mysql-bin
+binlog_format=ROW
+binlog_row_image=FULL
