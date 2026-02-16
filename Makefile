@@ -12,7 +12,7 @@ IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 .PHONY: deploy
 # 部署 stack
 deploy:
-	docker stack deploy -c docker-compose.stack.yml $(STACK_NAME)
+	docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth
 
 .PHONY: remove
 # 移除 stack
@@ -66,3 +66,7 @@ oracle-config-update:
 	done; \
 	echo "==> Oracle 設定更新完成"
 
+.PHONY: node-labels
+# 列出所有節點的 label
+node-labels:
+	docker node ls -q | xargs -I {} docker node inspect {} --format '{{ .Description.Hostname }} -> {{ .Spec.Labels }}'

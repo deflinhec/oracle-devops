@@ -384,14 +384,14 @@ services:
           - node.labels.role.cdc == true
       resources:
         limits:
-          cpus: "1"
-          memory: 4G
+          cpus: "2"
+          memory: 6G
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8083/"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
 
   # =========================
   # Nginx Load Balancer
