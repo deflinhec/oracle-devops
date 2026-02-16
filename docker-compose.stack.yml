@@ -447,6 +447,7 @@ services:
   api:
     <<: *oracle-services
     command: server
+    stop_grace_period: 30s
     deploy:
       mode: global
       restart_policy:
