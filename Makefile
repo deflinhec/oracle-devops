@@ -24,8 +24,9 @@ ORACLE_CONFIG_PATTERN ?= $(STACK_NAME)_oracle_config
 IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 
 .PHONY: deploy
-# 部署 stack
+# 部署 stack（IMAGE_REGISTRY、VERSION 會傳入 compose 供 image 使用）
 deploy:
+	IMAGE_REGISTRY="$(IMAGE_REGISTRY)" VERSION="$(VERSION)" \
 	docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth
 
 .PHONY: remove

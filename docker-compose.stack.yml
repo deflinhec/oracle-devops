@@ -382,9 +382,9 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+        delay: 10s
+        max_attempts: 10
+        window: 300s
       placement:
         constraints:
           # docker command: docker node update --label-add role.mq=true <node_id>
@@ -422,9 +422,9 @@ services:
       mode: global
       restart_policy:
         condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+        delay: 10s
+        max_attempts: 10
+        window: 300s
       update_config:
         parallelism: 1
         delay: 10s
@@ -451,9 +451,9 @@ services:
       mode: global
       restart_policy:
         condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+        delay: 10s
+        max_attempts: 10
+        window: 300s
       update_config:
         parallelism: 1
         delay: 10s
@@ -485,9 +485,9 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+        delay: 10s
+        max_attempts: 10
+        window: 300s
       placement:
         constraints:
           # docker command: docker node update --label-add role.consumer=true <node_id>
@@ -509,9 +509,9 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+        delay: 10s
+        max_attempts: 10
+        window: 300s
       placement:
         constraints:
           # docker command: docker node update --label-add role.scheduler=true <node_id>
