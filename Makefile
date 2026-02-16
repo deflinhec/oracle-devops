@@ -24,9 +24,8 @@ remove:
 config:
 	mkdir -p ./deploy
 	docker run -it --rm \
-		--network $(STACK_NAME)_oracle-network \
 		$(IMAGE_REGISTRY)oracle/app:develop \
-		deploy config --stdout > ./deploy/config.yaml
+		config deploy --stdout > ./deploy/config.yaml
 
 .PHONY: migrate
 # 遷移資料庫：從本地 deploy/config.yaml 遷移資料庫
