@@ -20,9 +20,16 @@ remove:
 	docker stack rm $(STACK_NAME)
 
 .PHONY: config
-# 部署應用設定：從映像檔中部署應用設定到本地 deploy/config.yaml
+# 部署應用設定：從映像檔中部署應用設定到本地 deploy/config.yaml（若已存在會先詢問，同意後改名为 config.<datetime>.yaml）
 config:
 	mkdir -p ./deploy
+	@if [ -f ./deploy/config.yaml ]; then \
+		printf 'deploy/config.yaml 已存在，是否覆寫？ [y/N] '; \
+		read -r ans; \
+		case "$$ans" in [yY]|[yY][eE][sS]) ;; *) echo '已取消'; exit 1; esac; \
+		ts=$$(date +%Y%m%d%H%M%S); \
+		mv ./deploy/config.yaml ./deploy/config.$$ts.yaml && echo "已將原檔移至 deploy/config.$$ts.yaml"; \
+	fi; \
 	docker run -it --rm \
 		$(IMAGE_REGISTRY)oracle/app:develop \
 		config deploy --stdout > ./deploy/config.yaml
@@ -35,6 +42,33 @@ migrate:
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:develop \
 		migrate up
+
+.PHONY: node-labels
+# 列出所有節點的 label
+node-labels:
+	docker node ls -q | xargs -I {} docker node inspect {} --format '{{ .Description.Hostname }} -> {{ .Spec.Labels }}'
+
+.PHONY: setup-cdc
+# 設定 CDC
+setup-cdc:
+	docker run -it --rm \
+		--network $(STACK_NAME)_oracle-network \
+		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
+		$(IMAGE_REGISTRY)oracle/app:develop \
+		cdc setup debezium
+
+.PHONY: setup-kafka
+# 設定 Kafka topic
+setup-kafka:
+	docker run -it --rm \
+		--network $(STACK_NAME)_oracle-network \
+		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
+		$(IMAGE_REGISTRY)oracle/app:develop \
+		kafka setup
+
+.PHONY: setup
+# 設定 CDC 與 Kafka topic
+setup: config migrate setup-cdc setup-kafka
 
 .PHONY: nginx-config-update
 # 更新 nginx 設定：建立帶時間戳的 config，移除符合的既有 config，再掛上新 config
@@ -66,7 +100,3 @@ oracle-config-update:
 	done; \
 	echo "==> Oracle 設定更新完成"
 
-.PHONY: node-labels
-# 列出所有節點的 label
-node-labels:
-	docker node ls -q | xargs -I {} docker node inspect {} --format '{{ .Description.Hostname }} -> {{ .Spec.Labels }}'
