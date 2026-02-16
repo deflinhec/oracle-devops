@@ -21,7 +21,7 @@ version: "3.8"
 # Oracle Services
 # =========================
 x-oracle-services: &oracle-services
-  image: 480126395291.dkr.ecr.ap-east-1.amazonaws.com/v2/igaming/oracle/app:develop
+  image: 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/oracle/app:develop
   environment:
     TZ: Asia/Taipei
     # Logging
