@@ -63,7 +63,7 @@ x-oracle-services: &oracle-services
     MONGODB_AUTH_SOURCE: admin
   configs:
     - source: oracle_config
-      target: /app/config.yaml
+      target: /app/deploy/config.yaml
       mode: 0444
   networks:
     - oracle-network
