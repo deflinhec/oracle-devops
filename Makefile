@@ -88,8 +88,8 @@ nginx-config-update:
 # 更新 Oracle 應用設定：建立帶時間戳的 config，更新 api / consumer / scheduler
 oracle-config-update:
 	@CONFIG_NEW="$(ORACLE_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
-	echo "==> 建立 config $$CONFIG_NEW（來源：./config.yaml）"; \
-	docker config create "$$CONFIG_NEW" ./config.yaml; \
+	echo "==> 建立 config $$CONFIG_NEW（來源：./deploy/config.yaml）"; \
+	docker config create "$$CONFIG_NEW" ./deploy/config.yaml; \
 	for svc in api consumer scheduler; do \
 	  RM_ARGS=""; \
 	  for c in $$(docker service inspect $(STACK_NAME)_$$svc --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(ORACLE_CONFIG_PATTERN)' || true); do \
