@@ -19,21 +19,22 @@ deploy:
 remove:
 	docker stack rm $(STACK_NAME)
 
-.PHONY: config-deploy
+.PHONY: config
 # 部署應用設定：從映像檔中部署應用設定到本地 deploy/config.yaml
-config-deploy:
+config:
+	mkdir -p ./deploy
 	docker run -it --rm \
-		--network ${STACK_NAME}_oracle-network \
-		${IMAGE_REGISTRY}oracle/app:develop \
+		--network $(STACK_NAME)_oracle-network \
+		$(IMAGE_REGISTRY)oracle/app:develop \
 		deploy config --stdout > ./deploy/config.yaml
 
 .PHONY: migrate
 # 遷移資料庫：從本地 deploy/config.yaml 遷移資料庫
 migrate:
 	docker run -it --rm \
-		--network ${STACK_NAME}_oracle-network \
+		--network $(STACK_NAME)_oracle-network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
-		${IMAGE_REGISTRY}oracle/app:develop \
+		$(IMAGE_REGISTRY)oracle/app:develop \
 		migrate up
 
 .PHONY: nginx-config-update
