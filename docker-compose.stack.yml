@@ -46,8 +46,8 @@ x-oracle-services: &oracle-services
     KAFKA_CONNECT_BROKERS: kafka01:9092,kafka02:9092,kafka03:9092
     KAFKA_CONNECT_DATABASE_HOST: mariadb
     KAFKA_CONNECT_DATABASE_PORT: 3306
-    KAFKA_CONNECT_DATABASE_USERNAME: ${MARIADB_USER:-oracle}
-    KAFKA_CONNECT_DATABASE_PASSWORD: ${MARIADB_PASSWORD:-oracle_password}
+    KAFKA_CONNECT_DATABASE_USERNAME: ${DB_USERNAME:-oracle}
+    KAFKA_CONNECT_DATABASE_PASSWORD: ${DB_PASSWORD:-oracle_password}
     # ClickHouse
     CLICKHOUSE_HOST: clickhouse
     CLICKHOUSE_PORT: 9000
@@ -146,10 +146,10 @@ services:
   mariadb:
     image: mariadb:10.11
     environment:
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root_password}
-      MARIADB_DATABASE: ${MARIADB_DATABASE:-oracle_db}
-      MARIADB_USER: ${MARIADB_USER:-oracle}
-      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-oracle_password}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
+      MARIADB_DATABASE: ${DB_DATABASE:-oracle_db}
+      MARIADB_USER: ${DB_USERNAME:-oracle}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-oracle_password}
       TZ: Asia/Taipei
     ports:
       - target: 3306
