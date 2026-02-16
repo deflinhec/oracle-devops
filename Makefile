@@ -5,6 +5,9 @@
 # 載入 .env 檔案
 -include .env
 
+# 映像檔 reference
+VERSION ?= develop
+
 # Stack 名稱
 STACK_NAME ?= oracle
 
@@ -30,6 +33,10 @@ deploy:
 remove:
 	docker stack rm $(STACK_NAME)
 
+########################################################
+# Config
+########################################################
+
 .PHONY: config
 # 部署應用設定：從映像檔中部署應用設定到本地 deploy/config.yaml（若已存在會先詢問，同意後改名为 config.<datetime>.yaml）
 config:
@@ -42,16 +49,34 @@ config:
 		mv ./deploy/config.yaml ./deploy/config.$$ts.yaml && echo "已將原檔移至 deploy/config.$$ts.yaml"; \
 	fi; \
 	docker run -it --rm \
-		$(IMAGE_REGISTRY)oracle/app:develop \
+		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		config deploy --stdout > ./deploy/config.yaml
+
+.PHONY: _ensure-config
+# 確保 config 存在
+_ensure-config:
+	@if [ ! -f ./deploy/config.yaml ]; then \
+		echo "==> 建立 config"; \
+		mkdir -p ./deploy; \
+		docker run -it --rm \
+			$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
+			config deploy --stdout > ./deploy/config.yaml; \
+		echo "==> config 建立完成"; \
+	else \
+		echo "==> config 已存在"; \
+	fi;
+
+########################################################
+# Migrate
+########################################################
 
 .PHONY: migrate
 # 遷移資料庫：從本地 deploy/config.yaml 遷移資料庫
-migrate:
+migrate: _ensure-config
 	docker run -it --rm \
 		--network $(STACK_NAME)_oracle-network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
-		$(IMAGE_REGISTRY)oracle/app:develop \
+		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		migrate up
 
 .PHONY: node-labels
@@ -67,19 +92,6 @@ node-labels:
 # 設定 CDC 與 Kafka topic
 setup: _ensure-config migrate setup-cdc setup-kafka
 
-.PHONY: _ensure-config
-# 確保 config 存在
-_ensure-config:
-	@if [ ! -f ./deploy/config.yaml ]; then \
-		echo "==> 建立 config"; \
-		mkdir -p ./deploy; \
-		docker run -it --rm \
-			$(IMAGE_REGISTRY)oracle/app:develop \
-			config deploy --stdout > ./deploy/config.yaml; \
-		echo "==> config 建立完成"; \
-	else \
-		echo "==> config 已存在"; \
-	fi;
 
 .PHONY: setup-cdc
 # 設定 CDC
@@ -87,12 +99,12 @@ setup-cdc:
 	docker run -it --rm \
 		--network $(STACK_NAME)_oracle-network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
-		$(IMAGE_REGISTRY)oracle/app:develop \
+		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		cdc setup db --user root --password $(DB_ROOT_PASSWORD)
 	docker run -it --rm \
 		--network $(STACK_NAME)_oracle-network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
-		$(IMAGE_REGISTRY)oracle/app:develop \
+		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		cdc setup debezium
 
 .PHONY: setup-kafka
@@ -101,7 +113,7 @@ setup-kafka:
 	docker run -it --rm \
 		--network $(STACK_NAME)_oracle-network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
-		$(IMAGE_REGISTRY)oracle/app:develop \
+		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		kafka setup
 
 ########################################################
@@ -110,11 +122,11 @@ setup-kafka:
 
 .PHONY: config-update
 # 更新 config
-config-update: config nginx-config-update oracle-config-update
+config-update: config-update-nginx config-update-oracle config-update-mariadb
 
-.PHONY: nginx-config-update
+.PHONY: config-update-nginx
 # 更新 nginx 設定：建立帶時間戳的 config，移除符合的既有 config，再掛上新 config
-nginx-config-update:
+config-update-nginx:
 	@CONFIG_NEW="$(NGINX_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/nginx/oracle.conf）"; \
 	docker config create "$$CONFIG_NEW" ./config/nginx/oracle.conf; \
@@ -126,9 +138,9 @@ nginx-config-update:
 	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/etc/nginx/sites-enabled/default $(STACK_NAME)_nginx; \
 	echo "==> nginx 設定更新完成"
 
-.PHONY: oracle-config-update
+.PHONY: config-update-oracle
 # 更新 Oracle 應用設定：建立帶時間戳的 config，更新 api / consumer / scheduler
-oracle-config-update:
+config-update-oracle:
 	@CONFIG_NEW="$(ORACLE_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./deploy/config.yaml）"; \
 	docker config create "$$CONFIG_NEW" ./deploy/config.yaml; \
@@ -142,9 +154,9 @@ oracle-config-update:
 	done; \
 	echo "==> Oracle 設定更新完成"
 
-.PHONY: mariadb-config-update
+.PHONY: config-update-mariadb
 # 更新 MariaDB 設定：建立帶時間戳的 config，更新 mariadb
-mariadb-config-update:
+config-update-mariadb:
 	@CONFIG_NEW="$(MARIADB_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/mariadb/mariadb.cnf）"; \
 	docker config create "$$CONFIG_NEW" ./config/mariadb/mariadb.cnf; \
