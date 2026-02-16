@@ -399,7 +399,7 @@ services:
   nginx:
     image: ubuntu/nginx:1.18-22.04_edge
     ports:
-      - target: 7351
+      - target: 80
         published: 80
         protocol: tcp
         mode: ingress
