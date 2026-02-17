@@ -11,21 +11,6 @@ VERSION ?= develop
 # Stack 名稱
 STACK_NAME ?= oracle
 
-# MariaDB 設定檔名稱前綴（更新時會移除符合的既有 config）
-MARIADB_CONFIG_PATTERN ?= $(STACK_NAME)_mariadb_config
-
-# nginx 設定檔名稱前綴（更新時會移除符合的既有 config）
-NGINX_CONFIG_PATTERN ?= $(STACK_NAME)_nginx_config
-
-# Oracle 應用設定檔名稱前綴（供 api、consumer、scheduler 使用）
-ORACLE_CONFIG_PATTERN ?= $(STACK_NAME)_oracle_config
-
-# Filebeat 設定檔名稱前綴（供 config-update-filebeat 使用；須以 [a-zA-Z0-9] 開頭）
-FILEBEAT_CONFIG_PATTERN ?= elk_filebeat_config
-
-# Logstash 設定檔名稱前綴（供 config-update-logstash 使用；須以 [a-zA-Z0-9] 開頭）
-LOGSTASH_CONFIG_PATTERN ?= elk_logstash_config
-
 # 映像檔 registry
 IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 
@@ -149,11 +134,12 @@ config-update: config-update-nginx config-update-oracle config-update-mariadb
 .PHONY: config-update-nginx
 # 更新 nginx 設定：建立帶時間戳的 config，移除符合的既有 config，再掛上新 config
 config-update-nginx:
-	@CONFIG_NEW="$(NGINX_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
+	@CONFIG_PATTERN="$(STACK_NAME)_nginx_config"; \
+	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/nginx/oracle.conf）"; \
 	docker config create "$$CONFIG_NEW" ./config/nginx/oracle.conf; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect $(STACK_NAME)_nginx --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(NGINX_CONFIG_PATTERN)' || true); do \
+	for c in $$(docker service inspect $(STACK_NAME)_nginx --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 	  [ -n "$$c" ] && { echo "    自 $(STACK_NAME)_nginx 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 $(STACK_NAME)_nginx，掛上 config $$CONFIG_NEW"; \
@@ -163,12 +149,13 @@ config-update-nginx:
 .PHONY: config-update-oracle
 # 更新 Oracle 應用設定：建立帶時間戳的 config，更新 api / consumer / scheduler
 config-update-oracle:
-	@CONFIG_NEW="$(ORACLE_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
+	@CONFIG_PATTERN="$(STACK_NAME)_oracle_config"; \
+	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./deploy/config.yaml）"; \
 	docker config create "$$CONFIG_NEW" ./deploy/config.yaml; \
 	for svc in api consumer scheduler; do \
 	  RM_ARGS=""; \
-	  for c in $$(docker service inspect $(STACK_NAME)_$$svc --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(ORACLE_CONFIG_PATTERN)' || true); do \
+	  for c in $$(docker service inspect $(STACK_NAME)_$$svc --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 	    [ -n "$$c" ] && { echo "    自 $(STACK_NAME)_$$svc 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	  done; \
 	  echo "==> 更新服務 $(STACK_NAME)_$$svc，掛上 config $$CONFIG_NEW"; \
@@ -179,11 +166,12 @@ config-update-oracle:
 .PHONY: config-update-mariadb
 # 更新 MariaDB 設定：建立帶時間戳的 config，更新 mariadb
 config-update-mariadb:
-	@CONFIG_NEW="$(MARIADB_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
+	@CONFIG_PATTERN="$(STACK_NAME)_mariadb_config"; \
+	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/mariadb/mariadb.cnf）"; \
 	docker config create "$$CONFIG_NEW" ./config/mariadb/mariadb.cnf; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect $(STACK_NAME)_mariadb --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(MARIADB_CONFIG_PATTERN)' || true); do \
+	for c in $$(docker service inspect $(STACK_NAME)_mariadb --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 	  [ -n "$$c" ] && { echo "    自 $(STACK_NAME)_mariadb 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 $(STACK_NAME)_mariadb，掛上 config $$CONFIG_NEW"; \
@@ -201,11 +189,12 @@ config-update-elk: config-update-filebeat config-update-logstash
 .PHONY: config-update-filebeat
 # 更新 filebeat 設定：建立帶時間戳的 config，更新 filebeat
 config-update-filebeat:
-	@CONFIG_NEW="$(FILEBEAT_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
+	@CONFIG_PATTERN="elk_filebeat_config"; \
+	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/filebeat/filebeat.yml）"; \
 	docker config create "$$CONFIG_NEW" ./config/filebeat/filebeat.yml; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect elk_filebeat --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(FILEBEAT_CONFIG_PATTERN)' || true); do \
+	for c in $$(docker service inspect elk_filebeat --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 		[ -n "$$c" ] && { echo "    自 elk_filebeat 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 elk_filebeat，掛上 config $$CONFIG_NEW"; \
@@ -215,11 +204,12 @@ config-update-filebeat:
 .PHONY: config-update-logstash
 # 更新 logstash 設定：建立帶時間戳的 config，更新 logstash
 config-update-logstash:
-	@CONFIG_NEW="$(LOGSTASH_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
+	@CONFIG_PATTERN="elk_logstash_config"; \
+	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/logstash/logstash.conf）"; \
 	docker config create "$$CONFIG_NEW" ./config/logstash/logstash.conf; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect elk_logstash --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(LOGSTASH_CONFIG_PATTERN)' || true); do \
+	for c in $$(docker service inspect elk_logstash --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 		[ -n "$$c" ] && { echo "    自 elk_logstash 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 elk_logstash，掛上 config $$CONFIG_NEW"; \
