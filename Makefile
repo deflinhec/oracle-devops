@@ -93,7 +93,6 @@ node-labels:
 # 設定 CDC 與 Kafka topic
 setup: _ensure-config migrate setup-cdc setup-kafka
 
-
 .PHONY: setup-cdc
 # 設定 CDC
 setup-cdc:
