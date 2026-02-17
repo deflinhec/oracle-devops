@@ -30,6 +30,12 @@ deploy: _ensure-registry
 	IMAGE_REGISTRY="$(IMAGE_REGISTRY)" VERSION="$(VERSION)" \
 	docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth
 
+.PHONY: deploy-consul
+# 部署 consul stack
+deploy-consul:
+	CONSUL_SERVER_IP=$(shell ip route get 8.8.8.8 | awk '{print $$7}') \
+	docker stack deploy -c docker-compose.consul.stack.yml consul
+
 .PHONY: deploy-elk
 # 部署 elk stack
 deploy-elk:
@@ -45,6 +51,11 @@ remove: remove-elk
 # 移除 elk stack
 remove-elk:
 	docker stack rm elk
+
+.PHONY: remove-consul
+# 移除 consul stack
+remove-consul:
+	docker stack rm consul
 
 ########################################################
 # Config

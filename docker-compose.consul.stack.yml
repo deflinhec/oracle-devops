@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  consul-server:
+    image: hashicorp/consul:1.19.0
+    network_mode: host
+    configs:
+      - source: consul_server_config
+        target: /etc/consul/consul.hcl
+        mode: 0444
+    volumes:
+      - consul_server_data:/consul/data
+    command: ["consul", "agent", "-config-file=/etc/consul/consul.hcl"]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          - node.role == manager
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  consul-client:
+    image: hashicorp/consul:1.19.0
+    environment:
+      # Consul Server 的 IP（該節點 ens5 私網 IP），必填或改 consul-client.hcl 預設值
+      - CONSUL_SERVER_IP=${CONSUL_SERVER_IP:-10.0.2.11}
+    network_mode: host
+    configs:
+      - source: consul_client_config
+        target: /etc/consul/consul.hcl
+        mode: 0444
+    volumes:
+      - consul_client_data:/consul/data
+    command: ["consul", "agent", "-config-file=/etc/consul/consul.hcl"]
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+configs:
+  consul_server_config:
+    file: ./config/consul/consul-server.hcl
+  consul_client_config:
+    file: ./config/consul/consul-client.hcl
+
+volumes:
+  consul_server_data:
+  consul_client_data:
