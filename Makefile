@@ -80,11 +80,6 @@ migrate: _ensure-config
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		migrate up
 
-.PHONY: node-labels
-# 列出所有節點的 label
-node-labels:
-	docker node ls -q | xargs -I {} docker node inspect {} --format '{{ .Description.Hostname }} -> {{ .Spec.Labels }}'
-
 ########################################################
 # Stack Setup
 ########################################################
@@ -190,3 +185,50 @@ image-update:
 			--update-delay 10s \
 			--with-registry-auth \
 			$(STACK_NAME)_api; \
+
+########################################################
+# Node Management
+########################################################
+
+.PHONY: node-list
+# 列出所有節點的 label
+node-list:
+	docker node ls -q | xargs -I {} docker node inspect {} \
+		--format '{{ .Description.Hostname }} -> {{ .Spec.Labels }}'
+
+.PHONY: node-label-add
+# 為節點加上 label
+node-label-add:
+	docker node update --label-add $1 $2
+
+.PHONY: node-label-remove
+# 為節點移除 label
+node-label-remove:
+	docker node update --label-rm $1 $2
+
+########################################################
+# Stack Management
+########################################################
+
+.PHONY: stack-services
+# 列出 stack 內所有服務
+stack-services:
+	docker stack services $(STACK_NAME)
+
+.PHONY: stack-tasks
+# 列出 stack 內所有 task
+stack-tasks:
+	docker stack ps $(STACK_NAME)
+
+########################################################
+# Shell
+########################################################
+.PHONY: shell
+# 建立 shell 進入 stack 內部
+shell:
+	docker run -it --rm \
+		--user root \
+		--network $(STACK_NAME)_oracle-network \
+		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
+		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
+		/bin/bash
