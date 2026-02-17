@@ -60,7 +60,7 @@ services:
       - "LS_JAVA_OPTS=-Xms1g -Xmx1g"
     configs:
       - source: logstash_config
-        target: /usr/share/logstash/pipeline/logstash.yml
+        target: /usr/share/logstash/pipeline/logstash.conf
         mode: 0444
     networks:
       - elk_network
@@ -277,7 +277,7 @@ networks:
 
 configs:
   logstash_config:
-    file: ./config/logstash/logstash.yml
+    file: ./config/logstash/logstash.conf
   prometheus_config:
     file: ./config/prometheus/prometheus.yml
   filebeat_config:
