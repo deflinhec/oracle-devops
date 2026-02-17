@@ -20,6 +20,12 @@ NGINX_CONFIG_PATTERN ?= $(STACK_NAME)_nginx_config
 # Oracle 應用設定檔名稱前綴（供 api、consumer、scheduler 使用）
 ORACLE_CONFIG_PATTERN ?= $(STACK_NAME)_oracle_config
 
+# Filebeat 設定檔名稱前綴（供 config-update-filebeat 使用；須以 [a-zA-Z0-9] 開頭）
+FILEBEAT_CONFIG_PATTERN ?= elk_filebeat_config
+
+# Logstash 設定檔名稱前綴（供 config-update-logstash 使用；須以 [a-zA-Z0-9] 開頭）
+LOGSTASH_CONFIG_PATTERN ?= elk_logstash_config
+
 # 映像檔 registry
 IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 
@@ -195,11 +201,11 @@ config-update-elk: config-update-filebeat config-update-logstash
 .PHONY: config-update-filebeat
 # 更新 filebeat 設定：建立帶時間戳的 config，更新 filebeat
 config-update-filebeat:
-	@CONFIG_NEW="$(ELK_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
+	@CONFIG_NEW="$(FILEBEAT_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/filebeat/filebeat.yml）"; \
 	docker config create "$$CONFIG_NEW" ./config/filebeat/filebeat.yml; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect elk_filebeat --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(ELK_CONFIG_PATTERN)' || true); do \
+	for c in $$(docker service inspect elk_filebeat --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(FILEBEAT_CONFIG_PATTERN)' || true); do \
 		[ -n "$$c" ] && { echo "    自 elk_filebeat 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 elk_filebeat，掛上 config $$CONFIG_NEW"; \
@@ -209,11 +215,11 @@ config-update-filebeat:
 .PHONY: config-update-logstash
 # 更新 logstash 設定：建立帶時間戳的 config，更新 logstash
 config-update-logstash:
-	@CONFIG_NEW="$(ELK_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
-	echo "==> 建立 config $$CONFIG_NEW（來源：./config/logstash/logstash.conf"; \
+	@CONFIG_NEW="$(LOGSTASH_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
+	echo "==> 建立 config $$CONFIG_NEW（來源：./config/logstash/logstash.conf）"; \
 	docker config create "$$CONFIG_NEW" ./config/logstash/logstash.conf; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect elk_logstash --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(ELK_CONFIG_PATTERN)' || true); do \
+	for c in $$(docker service inspect elk_logstash --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(LOGSTASH_CONFIG_PATTERN)' || true); do \
 		[ -n "$$c" ] && { echo "    自 elk_logstash 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 elk_logstash，掛上 config $$CONFIG_NEW"; \
