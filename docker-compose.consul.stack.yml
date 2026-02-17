@@ -5,11 +5,11 @@ services:
     image: hashicorp/consul:1.19.0
     network_mode: host
     configs:
-      - source: consul_server_config
+      - source: server_config
         target: /etc/consul/consul.hcl
         mode: 0444
     volumes:
-      - consul_server_data:/consul/data
+      - server_data:/consul/data
     command: ["consul", "agent", "-config-file=/etc/consul/consul.hcl"]
     deploy:
       replicas: 1
@@ -34,11 +34,11 @@ services:
       - CONSUL_SERVER_IP=${CONSUL_SERVER_IP:-10.0.2.11}
     network_mode: host
     configs:
-      - source: consul_client_config
+      - source: client_config
         target: /etc/consul/consul.hcl
         mode: 0444
     volumes:
-      - consul_client_data:/consul/data
+      - client_data:/consul/data
     command: ["consul", "agent", "-config-file=/etc/consul/consul.hcl"]
     deploy:
       mode: global
@@ -54,11 +54,13 @@ services:
       retries: 5
 
 configs:
-  consul_server_config:
+  server_config:
     file: ./config/consul/consul-server.hcl
-  consul_client_config:
+  client_config:
     file: ./config/consul/consul-client.hcl
 
 volumes:
-  consul_server_data:
-  consul_client_data:
+  server_data:
+    driver: local
+  client_data:
+    driver: local
