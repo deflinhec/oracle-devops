@@ -38,7 +38,7 @@ deploy-elk:
 
 .PHONY: remove
 # 移除 stack
-remove:
+remove: remove-elk
 	docker stack rm $(STACK_NAME)
 
 .PHONY: remove-elk
