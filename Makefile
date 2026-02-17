@@ -139,11 +139,15 @@ config-update-nginx:
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/nginx/oracle.conf）"; \
 	docker config create "$$CONFIG_NEW" ./config/nginx/oracle.conf; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect $(STACK_NAME)_nginx --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
+	for c in $$(docker service inspect $(STACK_NAME)_nginx \
+	  --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' \
+	  2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 	  [ -n "$$c" ] && { echo "    自 $(STACK_NAME)_nginx 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 $(STACK_NAME)_nginx，掛上 config $$CONFIG_NEW"; \
-	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/etc/nginx/sites-enabled/default $(STACK_NAME)_nginx; \
+	eval docker service update $$RM_ARGS \
+	  --config-add source="$$CONFIG_NEW",target=/etc/nginx/sites-enabled/default \
+	  $(STACK_NAME)_nginx; \
 	echo "==> nginx 設定更新完成"
 
 .PHONY: config-update-oracle
@@ -155,11 +159,15 @@ config-update-oracle:
 	docker config create "$$CONFIG_NEW" ./deploy/config.yaml; \
 	for svc in api consumer scheduler; do \
 	  RM_ARGS=""; \
-	  for c in $$(docker service inspect $(STACK_NAME)_$$svc --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
+	  for c in $$(docker service inspect $(STACK_NAME)_$$svc \
+	    --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' \
+	    2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 	    [ -n "$$c" ] && { echo "    自 $(STACK_NAME)_$$svc 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	  done; \
 	  echo "==> 更新服務 $(STACK_NAME)_$$svc，掛上 config $$CONFIG_NEW"; \
-	  eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/app/deploy/config.yaml,mode=0444 $(STACK_NAME)_$$svc; \
+	  eval docker service update $$RM_ARGS \
+	    --config-add source="$$CONFIG_NEW",target=/app/deploy/config.yaml,mode=0444 \
+	    $(STACK_NAME)_$$svc; \
 	done; \
 	echo "==> Oracle 設定更新完成"
 
@@ -171,11 +179,15 @@ config-update-mariadb:
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/mariadb/mariadb.cnf）"; \
 	docker config create "$$CONFIG_NEW" ./config/mariadb/mariadb.cnf; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect $(STACK_NAME)_mariadb --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
+	for c in $$(docker service inspect $(STACK_NAME)_mariadb \
+	  --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' \
+	  2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 	  [ -n "$$c" ] && { echo "    自 $(STACK_NAME)_mariadb 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 $(STACK_NAME)_mariadb，掛上 config $$CONFIG_NEW"; \
-	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/etc/mysql/conf.d/mariadb.cnf,mode=0444 $(STACK_NAME)_mariadb; \
+	eval docker service update $$RM_ARGS \
+	  --config-add source="$$CONFIG_NEW",target=/etc/mysql/conf.d/mariadb.cnf,mode=0444 \
+	  $(STACK_NAME)_mariadb; \
 	echo "==> MariaDB 設定更新完成"
 
 ########################################################
@@ -194,11 +206,15 @@ config-update-filebeat:
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/filebeat/filebeat.yml）"; \
 	docker config create "$$CONFIG_NEW" ./config/filebeat/filebeat.yml; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect elk_filebeat --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
+	for c in $$(docker service inspect elk_filebeat \
+	  --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' \
+	  2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 		[ -n "$$c" ] && { echo "    自 elk_filebeat 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 elk_filebeat，掛上 config $$CONFIG_NEW"; \
-	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/usr/share/filebeat/filebeat.yml,mode=0444 elk_filebeat; \
+	eval docker service update $$RM_ARGS \
+	  --config-add source="$$CONFIG_NEW",target=/usr/share/filebeat/filebeat.yml,mode=0444 \
+	  elk_filebeat; \
 	echo "==> Filebeat 設定更新完成"
 
 .PHONY: config-update-logstash
@@ -209,11 +225,15 @@ config-update-logstash:
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/logstash/logstash.conf）"; \
 	docker config create "$$CONFIG_NEW" ./config/logstash/logstash.conf; \
 	RM_ARGS=""; \
-	for c in $$(docker service inspect elk_logstash --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
+	for c in $$(docker service inspect elk_logstash \
+	  --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' \
+	  2>/dev/null | tr ' ' '\n' | grep "^$$CONFIG_PATTERN" || true); do \
 		[ -n "$$c" ] && { echo "    自 elk_logstash 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 elk_logstash，掛上 config $$CONFIG_NEW"; \
-	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/usr/share/logstash/pipeline/logstash.conf,mode=0444 elk_logstash; \
+	eval docker service update $$RM_ARGS \
+	  --config-add source="$$CONFIG_NEW",target=/usr/share/logstash/pipeline/logstash.conf,mode=0444 \
+	  elk_logstash; \
 	echo "==> Logstash 設定更新完成"
 
 ########################################################
