@@ -23,9 +23,19 @@ ORACLE_CONFIG_PATTERN ?= $(STACK_NAME)_oracle_config
 # 映像檔 registry
 IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 
+########################################################
+# Stack Management
+########################################################
+
+.PHONY: registry-login
+# 登入 registry
+registry-login:
+	aws ecr get-login-password --region ap-east-1 | docker login --username AWS --password-stdin $(IMAGE_REGISTRY)
+
+
 .PHONY: deploy
 # 部署 stack（IMAGE_REGISTRY、VERSION 會傳入 compose 供 image 使用）
-deploy:
+deploy: registry-login
 	IMAGE_REGISTRY="$(IMAGE_REGISTRY)" VERSION="$(VERSION)" \
 	docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth
 
