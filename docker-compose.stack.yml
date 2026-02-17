@@ -409,7 +409,7 @@ services:
       - target: 80
         published: 80
         protocol: tcp
-        mode: ingress
+        mode: host
     configs:
       - source: nginx_config
         target: /etc/nginx/sites-enabled/default
