@@ -27,15 +27,15 @@ IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 # Stack Management
 ########################################################
 
-.PHONY: registry-login
-# 登入 registry
-registry-login:
+.PHONY: _ensure-registry
+# 確保 registry 已登入
+_ensure-registry:
 	aws ecr get-login-password --region ap-east-1 | \
 		docker login --username AWS --password-stdin $(IMAGE_REGISTRY)
 
 .PHONY: deploy
 # 部署 stack（IMAGE_REGISTRY、VERSION 會傳入 compose 供 image 使用）
-deploy: registry-login
+deploy: _ensure-registry
 	IMAGE_REGISTRY="$(IMAGE_REGISTRY)" VERSION="$(VERSION)" \
 	docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth
 
@@ -50,7 +50,7 @@ remove:
 
 .PHONY: config
 # 部署應用設定：從映像檔中部署應用設定到本地 deploy/config.yaml（若已存在會先詢問，同意後改名为 config.<datetime>.yaml）
-config:
+config: _ensure-registry
 	mkdir -p ./deploy
 	@if [ -f ./deploy/config.yaml ]; then \
 		printf 'deploy/config.yaml 已存在，是否覆寫？ [y/N] '; \
@@ -65,7 +65,7 @@ config:
 
 .PHONY: _ensure-config
 # 確保 config 存在
-_ensure-config:
+_ensure-config: _ensure-registry
 	@if [ ! -f ./deploy/config.yaml ]; then \
 		echo "==> 建立 config"; \
 		mkdir -p ./deploy; \
@@ -96,11 +96,11 @@ migrate: _ensure-config
 
 .PHONY: setup
 # 設定 CDC 與 Kafka topic
-setup: _ensure-config migrate setup-cdc setup-kafka
+setup: migrate setup-cdc setup-kafka
 
 .PHONY: setup-cdc
 # 設定 CDC
-setup-cdc:
+setup-cdc: _ensure-config 
 	docker run -it --rm \
 		--network $(STACK_NAME)_oracle-network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
@@ -114,7 +114,7 @@ setup-cdc:
 
 .PHONY: setup-kafka
 # 設定 Kafka topic
-setup-kafka:
+setup-kafka: _ensure-config
 	docker run -it --rm \
 		--network $(STACK_NAME)_oracle-network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
@@ -179,7 +179,7 @@ config-update-mariadb:
 
 .PHONY: image-update
 # 更新 image
-image-update:
+image-update: _ensure-registry
 	docker service update \
 			--image $(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 			--with-registry-auth \
@@ -235,7 +235,7 @@ stack-tasks:
 ########################################################
 .PHONY: shell
 # 建立 shell 進入 stack 內部
-shell:
+shell: _ensure-registry
 	docker run -it --rm \
 		--user root \
 		--network $(STACK_NAME)_oracle-network \
