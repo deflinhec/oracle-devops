@@ -114,7 +114,7 @@ x-kafka-services: &kafka-service
   image: confluentinc/cp-kafka:7.4.0
   user: "0"
   networks:
-    - oracle-network
+    - backend_network
   entrypoint:
     - "/bin/bash"
     - "-c"

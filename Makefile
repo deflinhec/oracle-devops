@@ -85,7 +85,7 @@ _ensure-config: _ensure-registry
 # 遷移資料庫：從本地 deploy/config.yaml 遷移資料庫
 migrate: _ensure-config
 	docker run -it --rm \
-		--network $(STACK_NAME)_oracle-network \
+		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		migrate up
@@ -102,12 +102,12 @@ setup: migrate setup-cdc setup-kafka
 # 設定 CDC
 setup-cdc: _ensure-config 
 	docker run -it --rm \
-		--network $(STACK_NAME)_oracle-network \
+		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		cdc setup db --user root --password $(DB_ROOT_PASSWORD)
 	docker run -it --rm \
-		--network $(STACK_NAME)_oracle-network \
+		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		cdc setup debezium
@@ -116,7 +116,7 @@ setup-cdc: _ensure-config
 # 設定 Kafka topic
 setup-kafka: _ensure-config
 	docker run -it --rm \
-		--network $(STACK_NAME)_oracle-network \
+		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		kafka setup
@@ -238,7 +238,7 @@ stack-tasks:
 shell: _ensure-registry
 	docker run -it --rm \
 		--user root \
-		--network $(STACK_NAME)_oracle-network \
+		--network $(STACK_NAME)_backend_network \
 		--entrypoint "/bin/sh" \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
