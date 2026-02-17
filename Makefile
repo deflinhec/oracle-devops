@@ -239,6 +239,8 @@ shell: _ensure-registry
 	docker run -it --rm \
 		--user root \
 		--network $(STACK_NAME)_oracle-network \
+		--entrypoint "/bin/sh" \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
-		/bin/bash
+		-c "apk add curl bash vim \
+			&& exec bash"
