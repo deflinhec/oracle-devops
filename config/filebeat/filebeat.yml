@@ -136,14 +136,10 @@ processors:
 output.logstash:
   hosts: ["logstash:5044"]
 
-# Logging
+# Logging (to_files: false in containers — log to stdout; Docker captures it)
 logging.level: info
-logging.to_files: true
-logging.files:
-  path: /var/log/filebeat
-  name: filebeat
-  keepfiles: 7
-  permissions: 0644
+logging.to_files: false
+logging.to_stderr: true
 
 # Monitoring
 monitoring.enabled: true
