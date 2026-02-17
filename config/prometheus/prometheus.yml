@@ -48,13 +48,23 @@ scrape_configs:
         refresh_interval: 30s
     scrape_interval: 30s
 
-  # Node exporter (if added)
+  # Node exporter
   - job_name: 'node'
     dns_sd_configs:
       - names: ['tasks.node-exporter']
         type: 'A'
         port: 9100
         refresh_interval: 30s
+    scrape_interval: 30s
+
+  # cAdvisor: Docker container metrics (CPU, memory, I/O) per container
+  - job_name: 'cadvisor'
+    dns_sd_configs:
+      - names: ['tasks.cadvisor']
+        type: 'A'
+        port: 8080
+        refresh_interval: 30s
+    metrics_path: /metrics
     scrape_interval: 30s
 
   # Elasticsearch metrics

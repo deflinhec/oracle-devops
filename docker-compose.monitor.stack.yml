@@ -1,0 +1,163 @@
+version: "3.8"
+
+# Docker Swarm Stack (PRD) - node label placement
+#
+# Node label plan:
+#   role=monitor       : Prometheus / Grafana
+#
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.9.1
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+        mode: 0444
+    volumes:
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitor_network
+      - elk_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.monitor=true <node_id>
+          - node.labels.role.monitor == true
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.81.0-alpine
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    networks:
+      - monitor_network
+      - oracle_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.monitor=true <node_id>
+          - node.labels.role.monitor == true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9121/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # MySQL Exporter - MySQL 监控指标
+  mysql-exporter:
+    image: prom/mysqld-exporter:v0.18.0
+    environment:
+      - DATA_SOURCE_NAME=${DB_USERNAME:-oracle}:${DB_PASSWORD:-oracle_password}@tcp(mariadb:3306)/${DB_DATABASE:-oracle_db}
+    networks:
+      - monitor_network
+      - oracle_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.monitor=true <node_id>
+          - node.labels.role.monitor == true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9104/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    volumes:
+      - /proc:/proc:ro
+      - /sys:/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - monitor_network
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9100/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # cAdvisor: container metrics (CPU, memory, I/O) per container; one per node
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    networks:
+      - monitor_network
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+networks:
+  monitor_network:
+    name: monitor_network
+    driver: overlay
+    attachable: true
+  elk_network:
+    name: elk_network
+    driver: overlay
+    external: true
+  oracle_network:
+    name: ${STACK_NAME:-oracle}_backend_network
+    driver: overlay
+    external: true
+
+configs:
+  prometheus_config:
+    file: ./config/prometheus/prometheus.yml
+
+volumes:
+  prometheus_data:
+    driver: local
