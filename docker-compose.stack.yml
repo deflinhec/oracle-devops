@@ -414,6 +414,14 @@ services:
       - source: nginx_config
         target: /etc/nginx/sites-enabled/default
         mode: 0444
+      - source: nginx_log_format_config
+        target: /etc/nginx/conf.d/log_format.conf
+        mode: 0444
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - backend_network
     volumes:
@@ -532,6 +540,8 @@ networks:
 configs:
   nginx_config:
     file: ./config/nginx/oracle.conf
+  nginx_log_format_config:
+    file: ./config/nginx/log_format.conf
   oracle_config:
     file: ./deploy/config.yaml
   mariadb_config:
