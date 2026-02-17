@@ -210,14 +210,14 @@ config-update-filebeat:
 # 更新 logstash 設定：建立帶時間戳的 config，更新 logstash
 config-update-logstash:
 	@CONFIG_NEW="$(ELK_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
-	echo "==> 建立 config $$CONFIG_NEW（來源：./config/logstash/logstash.yml）"; \
-	docker config create "$$CONFIG_NEW" ./config/logstash/logstash.yml; \
+	echo "==> 建立 config $$CONFIG_NEW（來源：./config/logstash/logstash.conf"; \
+	docker config create "$$CONFIG_NEW" ./config/logstash/logstash.conf; \
 	RM_ARGS=""; \
 	for c in $$(docker service inspect elk_logstash --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(ELK_CONFIG_PATTERN)' || true); do \
 		[ -n "$$c" ] && { echo "    自 elk_logstash 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
 	done; \
 	echo "==> 更新服務 elk_logstash，掛上 config $$CONFIG_NEW"; \
-	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/usr/share/logstash/pipeline/logstash.yml,mode=0444 elk_logstash; \
+	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/usr/share/logstash/pipeline/logstash.conf,mode=0444 elk_logstash; \
 	echo "==> Logstash 設定更新完成"
 
 ########################################################
