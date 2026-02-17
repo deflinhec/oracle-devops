@@ -30,8 +30,8 @@ IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 .PHONY: registry-login
 # 登入 registry
 registry-login:
-	aws ecr get-login-password --region ap-east-1 | docker login --username AWS --password-stdin $(IMAGE_REGISTRY)
-
+	aws ecr get-login-password --region ap-east-1 | \
+		docker login --username AWS --password-stdin $(IMAGE_REGISTRY)
 
 .PHONY: deploy
 # 部署 stack（IMAGE_REGISTRY、VERSION 會傳入 compose 供 image 使用）
