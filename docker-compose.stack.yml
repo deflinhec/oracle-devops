@@ -66,7 +66,7 @@ x-oracle-services: &oracle-services
       target: /app/deploy/config.yaml
       mode: 0444
   networks:
-    - oracle-network
+    - backend_network
   logging:
     driver: "json-file"
     options:
@@ -169,7 +169,7 @@ services:
       - --innodb_flush_log_at_trx_commit=1
       - --sync_binlog=1
     networks:
-      - oracle-network
+      - backend_network
     deploy:
       replicas: 1
       restart_policy:
@@ -200,7 +200,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - oracle-network
+      - backend_network
     command: ["redis-server", "--appendonly", "yes"]
     deploy:
       replicas: 1
@@ -237,7 +237,7 @@ services:
     volumes:
       - mongodb_data:/data/db
     networks:
-      - oracle-network
+      - backend_network
     command: ["mongod", "--auth"]
     deploy:
       replicas: 1
@@ -279,7 +279,7 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     networks:
-      - oracle-network
+      - backend_network
     deploy:
       replicas: 1
       restart_policy:
@@ -372,7 +372,7 @@ services:
       KAFKA_CONNECT_PLUGINS_DIR: /kafka/connect,/kafka/connect/plugins
       HEAP_OPTS: "-Xms1g -Xmx3g"
     networks:
-      - oracle-network
+      - backend_network
     logging:
       driver: "json-file"
       options:
@@ -415,7 +415,7 @@ services:
         target: /etc/nginx/sites-enabled/default
         mode: 0444
     networks:
-      - oracle-network
+      - backend_network
     volumes:
       - /var/www:/var/www
     deploy:
@@ -525,7 +525,7 @@ services:
       start_period: 10s
 
 networks:
-  oracle-network:
+  backend_network:
     driver: overlay
     attachable: true
 
