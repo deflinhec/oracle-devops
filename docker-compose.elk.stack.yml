@@ -126,16 +126,17 @@ services:
         delay: 10s
         max_attempts: 10
         window: 300s
+    # Requires http.enabled: true in filebeat.yml (port 5066). Root path returns beat info.
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5066/stats || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:5066/ >/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/log:/var/log/cluster
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/var/log/cluster:ro
 
   # redis-exporter:
   #   image: oliver006/redis_exporter:v1.81.0-alpine

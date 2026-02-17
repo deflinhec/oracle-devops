@@ -236,6 +236,11 @@ logging.level: info
 logging.to_files: false
 logging.to_stderr: true
 
+# HTTP endpoint for healthchecks and Metricbeat (default port 5066)
+http.enabled: true
+http.host: localhost
+http.port: 5066
+
 # Monitoring
 monitoring.enabled: true
 monitoring.elasticsearch:
