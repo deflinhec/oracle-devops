@@ -42,6 +42,44 @@ services:
       timeout: 10s
       retries: 3
 
+  grafana:
+    image: grafana/grafana:12.3-ubuntu
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: ingress
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: oracle
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    configs:
+      - source: grafana_provisioning
+        target: /etc/grafana/provisioning/provisioning.yml
+        mode: 0444
+      - source: grafana_dashboards
+        target: /etc/grafana/dashboards/dashboards.yml
+        mode: 0444
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitor_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 300s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.monitor=true <node_id>
+          - node.labels.role.monitor == true
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   redis-exporter:
     image: oliver006/redis_exporter:v1.81.0-alpine
     environment:
@@ -157,7 +195,13 @@ networks:
 configs:
   prometheus_config:
     file: ./config/prometheus/prometheus.yml
+  grafana_provisioning:
+    file: ./config/grafana/provisioning/provisioning.yml
+  grafana_dashboards:
+    file: ./config/grafana/dashboards/dashboards.yml
 
 volumes:
   prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
