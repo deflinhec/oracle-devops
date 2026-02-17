@@ -125,12 +125,107 @@ filebeat.inputs:
       service: kafka
     fields_under_root: true
 
-# Processors
+# Processors (order matters: more specific matches first)
 processors:
   - add_host_metadata:
       when.not.contains.tags: forwarded
   - add_cloud_metadata: ~
   - add_docker_metadata: ~
+  # --- Container logs: set service from container name (stack: oracle_<svc>.<replica>.<task>) ---
+  - add_fields:
+      when.contains:
+        container.name: nginx
+      target: fields
+      fields: { service: nginx }
+  - add_fields:
+      when.contains:
+        container.name: _api.
+      target: fields
+      fields: { service: oracle-api }
+  - add_fields:
+      when.contains:
+        container.name: _consumer.
+      target: fields
+      fields: { service: oracle-consumer }
+  - add_fields:
+      when.contains:
+        container.name: _scheduler.
+      target: fields
+      fields: { service: oracle-scheduler }
+  - add_fields:
+      when.contains:
+        container.name: kafka-connect
+      target: fields
+      fields: { service: kafka-connect }
+  - add_fields:
+      when.contains:
+        container.name: kafka01
+      target: fields
+      fields: { service: kafka01 }
+  - add_fields:
+      when.contains:
+        container.name: kafka02
+      target: fields
+      fields: { service: kafka02 }
+  - add_fields:
+      when.contains:
+        container.name: kafka03
+      target: fields
+      fields: { service: kafka03 }
+  - add_fields:
+      when.contains:
+        container.name: mariadb
+      target: fields
+      fields: { service: mariadb }
+  - add_fields:
+      when.contains:
+        container.name: redis
+      target: fields
+      fields: { service: redis }
+  - add_fields:
+      when.contains:
+        container.name: mongodb
+      target: fields
+      fields: { service: mongodb }
+  - add_fields:
+      when.contains:
+        container.name: clickhouse
+      target: fields
+      fields: { service: clickhouse }
+  # --- Nginx: decode stdout (JSON access log), tag stderr (error log) ---
+  - decode_json_fields:
+      when.and:
+        - contains:
+            container.name: nginx
+        - equals:
+            stream: stdout
+      fields: ["message"]
+      target: ""
+      overwrite_keys: true
+      add_error_key: true
+  - add_fields:
+      when.and:
+        - contains:
+            container.name: nginx
+        - equals:
+            stream: stderr
+      target: fields
+      fields:
+        log_stream: stderr
+        log_type: nginx_error
+  # --- Oracle app (api, consumer, scheduler): stdout/stderr are ECS JSON ---
+  - decode_json_fields:
+      when.or:
+        - equals:
+            fields.service: oracle-api
+        - equals:
+            fields.service: oracle-consumer
+        - equals:
+            fields.service: oracle-scheduler
+      fields: ["message"]
+      target: ""
+      overwrite_keys: true
+      add_error_key: true
 
 # Output to Logstash
 output.logstash:
