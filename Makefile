@@ -39,10 +39,21 @@ deploy: _ensure-registry
 	IMAGE_REGISTRY="$(IMAGE_REGISTRY)" VERSION="$(VERSION)" \
 	docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth
 
+.PHONY: deploy-elk
+# 部署 elk stack
+deploy-elk:
+	STACK_NAME="$(STACK_NAME)" \
+	docker stack deploy -c docker-compose.elk.stack.yml elk
+
 .PHONY: remove
 # 移除 stack
 remove:
 	docker stack rm $(STACK_NAME)
+
+.PHONY: remove-elk
+# 移除 elk stack
+remove-elk:
+	docker stack rm elk
 
 ########################################################
 # Config
@@ -172,6 +183,42 @@ config-update-mariadb:
 	echo "==> 更新服務 $(STACK_NAME)_mariadb，掛上 config $$CONFIG_NEW"; \
 	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/etc/mysql/conf.d/mariadb.cnf,mode=0444 $(STACK_NAME)_mariadb; \
 	echo "==> MariaDB 設定更新完成"
+
+########################################################
+# 更新 Elasticsearch/Logstash/Filebeat Config
+########################################################
+
+.PHONY: config-update-elk
+# 更新 elk 設定：更新 filebeat / logstash
+config-update-elk: config-update-filebeat config-update-logstash
+
+.PHONY: config-update-filebeat
+# 更新 filebeat 設定：建立帶時間戳的 config，更新 filebeat
+config-update-filebeat:
+	@CONFIG_NEW="$(ELK_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
+	echo "==> 建立 config $$CONFIG_NEW（來源：./config/filebeat/filebeat.yml）"; \
+	docker config create "$$CONFIG_NEW" ./config/filebeat/filebeat.yml; \
+	RM_ARGS=""; \
+	for c in $$(docker service inspect elk_filebeat --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(ELK_CONFIG_PATTERN)' || true); do \
+		[ -n "$$c" ] && { echo "    自 elk_filebeat 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
+	done; \
+	echo "==> 更新服務 elk_filebeat，掛上 config $$CONFIG_NEW"; \
+	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/usr/share/filebeat/filebeat.yml,mode=0444 elk_filebeat; \
+	echo "==> Filebeat 設定更新完成"
+
+.PHONY: config-update-logstash
+# 更新 logstash 設定：建立帶時間戳的 config，更新 logstash
+config-update-logstash:
+	@CONFIG_NEW="$(ELK_CONFIG_PATTERN)_$$(date +%Y%m%d%H%M%S)"; \
+	echo "==> 建立 config $$CONFIG_NEW（來源：./config/logstash/logstash.yml）"; \
+	docker config create "$$CONFIG_NEW" ./config/logstash/logstash.yml; \
+	RM_ARGS=""; \
+	for c in $$(docker service inspect elk_logstash --format '{{range .Spec.TaskTemplate.ContainerSpec.Configs}}{{.ConfigName}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '^$(ELK_CONFIG_PATTERN)' || true); do \
+		[ -n "$$c" ] && { echo "    自 elk_logstash 移除 config $$c"; RM_ARGS="$$RM_ARGS --config-rm $$c"; }; \
+	done; \
+	echo "==> 更新服務 elk_logstash，掛上 config $$CONFIG_NEW"; \
+	eval docker service update $$RM_ARGS --config-add source="$$CONFIG_NEW",target=/usr/share/logstash/pipeline/logstash.yml,mode=0444 elk_logstash; \
+	echo "==> Logstash 設定更新完成"
 
 ########################################################
 # Image Update

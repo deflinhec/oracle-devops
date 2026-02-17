@@ -1,0 +1,88 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # DNS SD in Swarm:
+  # - With tasks:  names: ['tasks.<service>']  → resolves to every task IP (per-instance metrics).
+  # - Without tasks: names: ['<service>']      → resolves to service VIP only (single target).
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    dns_sd_configs:
+      - names: ['localhost']
+        type: 'A'
+        port: 9090
+        refresh_interval: 30s
+
+  # Oracle API service metrics (if exposed)
+  - job_name: 'oracle-api'
+    dns_sd_configs:
+      # With tasks (per replica); without: ['api']
+      - names: ['tasks.api']
+        type: 'A'
+        port: 7350
+        refresh_interval: 30s
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # MySQL exporter
+  - job_name: 'mysql'
+    dns_sd_configs:
+      - names: ['tasks.mysql-exporter']
+        type: 'A'
+        port: 9104
+        refresh_interval: 30s
+    scrape_interval: 30s
+
+  # Redis exporter
+  - job_name: 'redis'
+    dns_sd_configs:
+      - names: ['tasks.redis-exporter']
+        type: 'A'
+        port: 9121
+        refresh_interval: 30s
+    scrape_interval: 30s
+
+  # Node exporter (if added)
+  - job_name: 'node'
+    dns_sd_configs:
+      - names: ['tasks.node-exporter']
+        type: 'A'
+        port: 9100
+        refresh_interval: 30s
+    scrape_interval: 30s
+
+  # Elasticsearch metrics
+  - job_name: 'elasticsearch'
+    dns_sd_configs:
+      - names: ['tasks.elasticsearch']
+        type: 'A'
+        port: 9200
+        refresh_interval: 30s
+    metrics_path: '/_prometheus/metrics'
+    scrape_interval: 30s
+
+  # Logstash metrics
+  - job_name: 'logstash'
+    dns_sd_configs:
+      - names: ['tasks.logstash']
+        type: 'A'
+        port: 9600
+        refresh_interval: 30s
+    metrics_path: '/_node/stats/prometheus'
+    scrape_interval: 30s
+
+  # Filebeat metrics
+  - job_name: 'filebeat'
+    dns_sd_configs:
+      - names: ['tasks.filebeat']
+        type: 'A'
+        port: 5066
+        refresh_interval: 30s
+    metrics_path: '/stats'
+    scrape_interval: 30s

@@ -3,6 +3,18 @@
 # (fields: @timestamp, log.level, message, log.origin, log.logger, ecs.version, error.*).
 
 filebeat.inputs:
+  # Docker container logs (mount host /var/lib/docker/containers and /var/run/docker.sock into Filebeat container)
+  - type: container
+    enabled: true
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+    fields:
+      log_source: docker
+    fields_under_root: false
+  
   # Oracle app (ecszap ECS JSON)
   - type: filestream
     id: oracle-app
@@ -71,14 +83,7 @@ filebeat.inputs:
       service: oracle-consumer
     fields_under_root: true
 
-  # Docker container logs
-  # - type: container
-  #   enabled: true
-  #   paths:
-  #     - '/var/lib/docker/containers/*/*.log'
-  #   processors:
-  #     - add_docker_metadata:
-  #         host: "unix:///var/run/docker.sock"
+
 
   # MySQL logs (plain text)
   - type: filestream
