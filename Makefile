@@ -6,7 +6,7 @@
 -include .env
 
 # 映像檔 reference
-VERSION ?= develop
+VERSION ?= master
 
 # Stack 名稱
 STACK_NAME ?= oracle
