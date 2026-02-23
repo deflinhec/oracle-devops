@@ -1,0 +1,247 @@
+# Filebeat config for Oracle stack (filestream inputs for rotation-safe ingestion).
+# Application logs are ECS JSON from pkg/logger + go.elastic.co/ecszap
+# (fields: @timestamp, log.level, message, log.origin, log.logger, ecs.version, error.*).
+
+filebeat.inputs:
+  # Docker container logs (mount host /var/lib/docker/containers and /var/run/docker.sock into Filebeat container)
+  - type: container
+    enabled: true
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+    fields:
+      log_source: docker
+    fields_under_root: false
+  
+  # Oracle app (ecszap ECS JSON)
+  - type: filestream
+    id: oracle-app
+    enabled: true
+    paths:
+      - /var/log/oracle/app.log
+      - /var/log/oracle/app.err.log
+      - /var/log/supervisor/oracle.app.log
+      - /var/log/supervisor/oracle.app.err.log
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      service: oracle-app
+    fields_under_root: true
+
+  # Oracle server (ecszap ECS JSON)
+  - type: filestream
+    id: oracle-server
+    enabled: true
+    paths:
+      - /var/log/oracle/server.log
+      - /var/log/oracle/server.err.log
+      - /var/log/supervisor/oracle.server.log
+      - /var/log/supervisor/oracle.server.err.log
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      service: oracle-server
+    fields_under_root: true
+
+  # Oracle scheduler (ecszap ECS JSON)
+  - type: filestream
+    id: oracle-scheduler
+    enabled: true
+    paths:
+      - /var/log/oracle/scheduler.log
+      - /var/log/oracle/scheduler.err.log
+      - /var/log/supervisor/oracle.scheduler.log
+      - /var/log/supervisor/oracle.scheduler.err.log
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      service: oracle-scheduler
+    fields_under_root: true
+
+  # Oracle consumer (ecszap ECS JSON)
+  - type: filestream
+    id: oracle-consumer
+    enabled: true
+    paths:
+      - /var/log/oracle/consumer.log
+      - /var/log/oracle/consumer.err.log
+      - /var/log/supervisor/oracle.consumer.log
+      - /var/log/supervisor/oracle.consumer.err.log
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      service: oracle-consumer
+    fields_under_root: true
+
+
+
+  # MySQL logs (plain text)
+  - type: filestream
+    id: mysql
+    enabled: true
+    paths:
+      - /var/log/oracle/mysql/*.log
+    fields:
+      service: mysql
+    fields_under_root: true
+
+  # Redis logs (plain text)
+  - type: filestream
+    id: redis
+    enabled: true
+    paths:
+      - /var/log/oracle/redis/*.log
+    fields:
+      service: redis
+    fields_under_root: true
+
+  # ClickHouse logs (plain text)
+  - type: filestream
+    id: clickhouse
+    enabled: true
+    paths:
+      - /var/log/oracle/clickhouse/*.log
+    fields:
+      service: clickhouse
+    fields_under_root: true
+
+  # Kafka logs (plain text)
+  - type: filestream
+    id: kafka
+    enabled: true
+    paths:
+      - /var/log/oracle/kafka/*.log
+    fields:
+      service: kafka
+    fields_under_root: true
+
+# Processors (order matters: more specific matches first)
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  # --- Container logs: set service from container name (stack: oracle_<svc>.<replica>.<task>) ---
+  - add_fields:
+      when.contains:
+        container.name: nginx
+      target: fields
+      fields: { service: nginx }
+  - add_fields:
+      when.contains:
+        container.name: _api.
+      target: fields
+      fields: { service: oracle-api }
+  - add_fields:
+      when.contains:
+        container.name: _consumer.
+      target: fields
+      fields: { service: oracle-consumer }
+  - add_fields:
+      when.contains:
+        container.name: _scheduler.
+      target: fields
+      fields: { service: oracle-scheduler }
+  - add_fields:
+      when.contains:
+        container.name: kafka-connect
+      target: fields
+      fields: { service: kafka-connect }
+  - add_fields:
+      when.contains:
+        container.name: kafka01
+      target: fields
+      fields: { service: kafka01 }
+  - add_fields:
+      when.contains:
+        container.name: kafka02
+      target: fields
+      fields: { service: kafka02 }
+  - add_fields:
+      when.contains:
+        container.name: kafka03
+      target: fields
+      fields: { service: kafka03 }
+  - add_fields:
+      when.contains:
+        container.name: mariadb
+      target: fields
+      fields: { service: mariadb }
+  - add_fields:
+      when.contains:
+        container.name: redis
+      target: fields
+      fields: { service: redis }
+  - add_fields:
+      when.contains:
+        container.name: mongodb
+      target: fields
+      fields: { service: mongodb }
+  - add_fields:
+      when.contains:
+        container.name: clickhouse
+      target: fields
+      fields: { service: clickhouse }
+  # --- Nginx: decode stdout (JSON access log), tag stderr (error log) ---
+  - decode_json_fields:
+      when.and:
+        - contains:
+            container.name: nginx
+        - equals:
+            stream: stdout
+      fields: ["message"]
+      target: ""
+      overwrite_keys: true
+      add_error_key: true
+  - add_fields:
+      when.and:
+        - contains:
+            container.name: nginx
+        - equals:
+            stream: stderr
+      target: fields
+      fields:
+        log_stream: stderr
+        log_type: nginx_error
+  # --- Oracle app (api, consumer, scheduler): stdout/stderr are ECS JSON ---
+  - decode_json_fields:
+      when.or:
+        - equals:
+            fields.service: oracle-api
+        - equals:
+            fields.service: oracle-consumer
+        - equals:
+            fields.service: oracle-scheduler
+      fields: ["message"]
+      target: ""
+      overwrite_keys: true
+      add_error_key: true
+
+# Output to Logstash
+output.logstash:
+  hosts: ["logstash:5044"]
+
+# Logging (to_files: false in containers — log to stdout; Docker captures it)
+logging.level: info
+logging.to_files: false
+logging.to_stderr: true
+
+# HTTP endpoint for healthchecks and Metricbeat (default port 5066)
+http.enabled: true
+http.host: localhost
+http.port: 5066
+
+# Monitoring
+monitoring.enabled: true
+monitoring.elasticsearch:
+  hosts: ["elasticsearch:9200"]

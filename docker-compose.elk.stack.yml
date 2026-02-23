@@ -1,0 +1,159 @@
+version: "3.8"
+
+# Docker Swarm Stack (PRD) - node label placement
+#
+# Node label plan:
+#   role=elk       : Elasticsearch / Logstash / Kibana
+#
+
+services:
+ 
+  # =========================
+  # Elasticsearch
+  # =========================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=default-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - elk_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.elk=true <node_id>
+          - node.labels.role.elk == true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    environment:
+      - "LS_JAVA_OPTS=-Xms1g -Xmx1g"
+    configs:
+      - source: logstash_config
+        target: /usr/share/logstash/pipeline/logstash.conf
+        mode: 0444
+    networks:
+      - elk_network
+      - oracle_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.elk=true <node_id>
+          - node.labels.role.elk == true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9600/_node/stats || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - xpack.security.enabled=false
+      - xpack.encryptedSavedObjects.encryptionKey=oracle-encryption-key-32-chars
+    networks:
+      - elk_network
+      - oracle_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.elk=true <node_id>
+          - node.labels.role.elk == true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    configs:
+      - source: filebeat_config
+        target: /usr/share/filebeat/filebeat.yml
+        mode: 0444
+    networks:
+      - elk_network
+      - oracle_network
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+    # Requires http.enabled: true in filebeat.yml (port 5066). Root path returns beat info.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:5066/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/var/log/cluster:ro
+
+networks:
+  elk_network:
+    name: elk_network
+    driver: overlay
+    attachable: true
+  oracle_network:
+    name: ${STACK_NAME:-oracle}_backend_network
+    driver: overlay
+    external: true
+
+configs:
+  logstash_config:
+    file: ./config/logstash/logstash.conf
+  filebeat_config:
+    file: ./config/filebeat/filebeat.yml
+    
+volumes:
+  elasticsearch_data:
+    driver: local
