@@ -83,7 +83,7 @@ services:
       - util_network
       - oracle_network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8978/api/health"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8978/api/health -o /dev/null || wget -q --spider http://localhost:8978/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -115,7 +115,8 @@ services:
       - util_network
       - oracle_network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8081/"]
+      # Basic auth is enabled; pass credentials so 401 doesn't fail the check
+      test: ["CMD-SHELL", "wget -q --spider --user=$$ME_CONFIG_BASICAUTH_USERNAME --password=$$ME_CONFIG_BASICAUTH_PASSWORD http://localhost:8081/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -151,7 +152,7 @@ services:
       - util_network
       - oracle_network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8080/api/health"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/health -o /dev/null || wget -q --spider http://localhost:8080/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
