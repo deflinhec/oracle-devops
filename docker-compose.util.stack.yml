@@ -91,7 +91,6 @@ services:
 
   mongo-express:
     image: mongo-express:1.0.2-20-alpine3.19
-    restart: unless-stopped
     environment:
       TZ: Asia/Taipei
       ME_CONFIG_MONGODB_URL: mongodb://${MONGODB_USERNAME:-oracle}:${MONGODB_PASSWORD:-oracle_password}@mongodb:27017/${MONGODB_DATABASE:-oracle_mdb}
