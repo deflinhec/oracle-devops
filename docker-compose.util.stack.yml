@@ -1,0 +1,176 @@
+version: "3.8"
+
+# Docker Swarm Stack (PRD) - node label placement
+#
+# Node label plan:
+#   role=util       : CloudBeaver / Kafka UI / Mongo Express
+
+services:
+  cloudbeaver:
+    image: dbeaver/cloudbeaver:25.3.5
+    environment:
+      TZ: Asia/Taipei
+      # Server Configuration (根據官方文檔)
+      CB_SERVER_URL: http://localhost:8978
+      CB_SERVER_NAME: Oracle Database Manager
+      
+      # Admin User (自動配置)
+      CB_ADMIN_NAME: ${CLOUDBEAVER_ADMIN_NAME:-cbadmin}
+      CB_ADMIN_PASSWORD: ${CLOUDBEAVER_ADMIN_PASSWORD:-cbadmin}
+
+      # Database Configuration
+      DB_HOST: ${DB_HOST:-mariadb}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_USERNAME: ${DB_USERNAME:-oracle}
+      DB_PASSWORD: ${DB_PASSWORD:-oracle_password}
+      DB_DATABASE: ${DB_DATABASE:-oracle_mdb}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-8123}
+      CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-oracle_analytics}
+      CLICKHOUSE_USERNAME: ${CLICKHOUSE_USERNAME:-oracle}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-oracle_password}
+      
+      # 應用程式設定
+      CLOUDBEAVER_APP_SUPPORTS_CUSTOM_CONNECTIONS: true
+      CLOUDBEAVER_APP_PUBLIC_CREDENTIALS_SAVE_ENABLED: true
+      CLOUDBEAVER_APP_ADMIN_CREDENTIALS_SAVE_ENABLED: true
+      CLOUDBEAVER_APP_RESOURCE_MANAGER_ENABLED: true
+      CLOUDBEAVER_APP_READ_ONLY_CONNECTION_INFO: true
+      CLOUDBEAVER_SYSTEM_VARIABLES_RESOLVING_ENABLED: true
+      
+      # 資源配額設定
+      CLOUDBEAVER_RESOURCE_QUOTA_SQL_MAX_RUNNING_QUERIES: 10
+      CLOUDBEAVER_RESOURCE_QUOTA_SQL_RESULT_SET_ROWS_LIMIT: 10000
+      CLOUDBEAVER_RESOURCE_QUOTA_SQL_TEXT_PREVIEW_MAX_LENGTH: 1048576
+      CLOUDBEAVER_RESOURCE_QUOTA_SQL_BINARY_PREVIEW_MAX_LENGTH: 1048576
+      
+      # 資料庫連線池設定（對應 server.database.pool，見官方 Server configuration）
+      CLOUDBEAVER_DB_MIN_IDLE_CONNECTIONS: 1
+      CLOUDBEAVER_DB_MAX_IDLE_CONNECTIONS: 10
+      CLOUDBEAVER_DB_MAX_CONNECTIONS: 20
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 0s
+        failure_action: pause
+        order: stop-first
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.cloudbeaver=true <node_id>
+          - node.labels.role.util == true
+    configs:
+      - source: cloudbeaver_config
+        target: /opt/cloudbeaver/conf/initial-data-sources.json
+        mode: 0444
+    volumes:
+      - cloudbeaver_data:/opt/cloudbeaver/workspace
+    networks:
+      - util_network
+      - oracle_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8978/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  mongo-express:
+    image: mongo-express:1.0.2-20-alpine3.19
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Taipei
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGODB_USERNAME:-oracle}:${MONGODB_PASSWORD:-oracle_password}@mongodb:27017/${MONGODB_DATABASE:-oracle_mdb}
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin}
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+      placement:
+        constraints:
+          - node.labels.role.util == true
+    networks:
+      - util_network
+      - oracle_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8081/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    environment:
+      TZ: Asia/Taipei
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 300s
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.monitor=true <node_id>
+          - node.labels.role.util == true
+    networks:
+      - util_network
+      - oracle_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  util_network:
+    name: util_network
+    driver: overlay
+    attachable: true
+  oracle_network:
+    name: ${STACK_NAME:-oracle}_backend_network
+    driver: overlay
+    external: true
+
+configs:
+  cloudbeaver_config:
+    file: ./config/cloudbeaver/initial-data-sources.json
+
+volumes:
+  cloudbeaver_data:
+    driver: local

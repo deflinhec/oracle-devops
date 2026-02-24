@@ -230,9 +230,9 @@ services:
         protocol: tcp
         mode: ingress
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-oracle}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-oracle_password}
-      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-oracle_mdb}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME:-oracle}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-oracle_password}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE:-oracle_mdb}
       TZ: Asia/Taipei
     volumes:
       - mongodb_data:/data/db
@@ -271,7 +271,7 @@ services:
         protocol: tcp
         mode: ingress
     environment:
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-oracle_analytics}
+      CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-oracle_analytics}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-oracle}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-oracle_password}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
