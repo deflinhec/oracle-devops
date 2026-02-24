@@ -71,7 +71,7 @@ services:
           memory: 1G
       placement:
         constraints:
-          # docker command: docker node update --label-add role.cloudbeaver=true <node_id>
+          # docker command: docker node update --label-add role.util=true <node_id>
           - node.labels.role.util == true
     configs:
       - source: cloudbeaver_config
@@ -110,6 +110,7 @@ services:
           memory: 1G
       placement:
         constraints:
+          # docker command: docker node update --label-add role.util=true <node_id>
           - node.labels.role.util == true
     networks:
       - util_network
@@ -145,7 +146,7 @@ services:
           memory: 1G
       placement:
         constraints:
-          # docker command: docker node update --label-add role.monitor=true <node_id>
+          # docker command: docker node update --label-add role.util=true <node_id>
           - node.labels.role.util == true
     networks:
       - util_network
