@@ -23,44 +23,44 @@ version: "3.8"
 x-oracle-services: &oracle-services
   image: ${IMAGE_REGISTRY}oracle/app:${VERSION}
   environment:
-    TZ: Asia/Taipei
+    TZ: ${TZ:-Asia/Taipei}
     # Logging
-    LOG_LEVEL: info
-    LOG_ENCODING: json
-    LOG_OUTPUT_PATHS: stdout
-    LOG_ERROR_OUTPUT_PATHS: stderr
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    LOG_ENCODING: ${LOG_ENCODING:-json}
+    LOG_OUTPUT_PATHS: ${LOG_OUTPUT_PATHS:-stdout}
+    LOG_ERROR_OUTPUT_PATHS: ${LOG_ERROR_OUTPUT_PATHS:-stderr}
     # Database
-    DB_HOST: mariadb
-    DB_PORT: 3306
+    DB_HOST: ${DB_HOST:-mariadb}
+    DB_PORT: ${DB_PORT:-3306}
     DB_DATABASE: ${DB_DATABASE:-oracle_db}
     DB_USERNAME: ${DB_USERNAME:-oracle}
     DB_PASSWORD: ${DB_PASSWORD:-oracle_password}
     # Redis
-    REDIS_HOST: redis
-    REDIS_PORT: 6379
+    REDIS_HOST: ${REDIS_HOST:-redis}
+    REDIS_PORT: ${REDIS_PORT:-6379}
     # Kafka brokers
-    KAFKA_BROKERS: kafka01:9092,kafka02:9092,kafka03:9092
+    KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka01:9092,kafka02:9092,kafka03:9092}
     # Kafka Connect
-    KAFKA_CONNECT_URL: http://kafka-connect:8083
-    KAFKA_CONNECT_SERVER_ID: 1
-    KAFKA_CONNECT_BROKERS: kafka01:9092,kafka02:9092,kafka03:9092
-    KAFKA_CONNECT_DATABASE_HOST: mariadb
-    KAFKA_CONNECT_DATABASE_PORT: 3306
-    KAFKA_CONNECT_DATABASE_USERNAME: ${DB_USERNAME:-oracle}
-    KAFKA_CONNECT_DATABASE_PASSWORD: ${DB_PASSWORD:-oracle_password}
+    KAFKA_CONNECT_URL: ${KAFKA_CONNECT_URL:-http://kafka-connect:8083}
+    KAFKA_CONNECT_SERVER_ID: ${KAFKA_CONNECT_SERVER_ID:-1}
+    KAFKA_CONNECT_BROKERS: ${KAFKA_CONNECT_BROKERS:-kafka01:9092,kafka02:9092,kafka03:9092}
+    KAFKA_CONNECT_DATABASE_HOST: ${KAFKA_CONNECT_DATABASE_HOST:-mariadb}
+    KAFKA_CONNECT_DATABASE_PORT: ${KAFKA_CONNECT_DATABASE_PORT:-3306}
+    KAFKA_CONNECT_DATABASE_USERNAME: ${KAFKA_CONNECT_DATABASE_USERNAME:-oracle}
+    KAFKA_CONNECT_DATABASE_PASSWORD: ${KAFKA_CONNECT_DATABASE_PASSWORD:-oracle_password}
     # ClickHouse
-    CLICKHOUSE_HOST: clickhouse
-    CLICKHOUSE_PORT: 9000
+    CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+    CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-9000}
     CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-oracle_analytics}
     CLICKHOUSE_USERNAME: ${CLICKHOUSE_USERNAME:-oracle}
     CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-oracle_password}
     # MongoDB
-    MONGODB_HOST: mongodb
-    MONGODB_PORT: 27017
+    MONGODB_HOST: ${MONGODB_HOST:-mongodb}
+    MONGODB_PORT: ${MONGODB_PORT:-27017}
     MONGODB_DATABASE: ${MONGODB_DATABASE:-oracle_mdb}
     MONGODB_USERNAME: ${MONGODB_USERNAME:-oracle}
     MONGODB_PASSWORD: ${MONGODB_PASSWORD:-oracle_password}
-    MONGODB_AUTH_SOURCE: admin
+    MONGODB_AUTH_SOURCE: ${MONGODB_AUTH_SOURCE:-admin}
   configs:
     - source: oracle_config
       target: /app/deploy/config.yaml
