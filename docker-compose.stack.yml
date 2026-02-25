@@ -272,7 +272,7 @@ services:
         mode: ingress
     environment:
       CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-oracle_analytics}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-oracle}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USERNAME:-oracle}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-oracle_password}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       TZ: Asia/Taipei
@@ -359,10 +359,10 @@ services:
     environment:
       TZ: Asia/Taipei
       BOOTSTRAP_SERVERS: kafka01:9092,kafka02:9092,kafka03:9092
-      GROUP_ID: oracle-connect-cluster
-      CONFIG_STORAGE_TOPIC: connect-configs
-      OFFSET_STORAGE_TOPIC: connect-offsets
-      STATUS_STORAGE_TOPIC: connect-status
+      GROUP_ID: connect
+      CONFIG_STORAGE_TOPIC: __connect-configs
+      OFFSET_STORAGE_TOPIC: __connect-offsets
+      STATUS_STORAGE_TOPIC: __connect-status
       CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 3
       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 3
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 3
