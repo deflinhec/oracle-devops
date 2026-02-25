@@ -14,6 +14,7 @@ STACK_NAME ?= oracle
 # 映像檔 registry
 IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 
+export
 ########################################################
 # Registry Management
 ########################################################
@@ -39,7 +40,6 @@ deploy-%:
 	@echo "Deploying $* stack..."
 	@if [ "$*" = "app" ]; then \
 		$(MAKE) _ensure-registry; \
-		IMAGE_REGISTRY="$(IMAGE_REGISTRY)" VERSION="$(VERSION)" \
 		docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth; \
 	elif [ "$*" = "elk" ]; then \
 		docker stack deploy -c docker-compose.$*.stack.yml $*; \
@@ -158,7 +158,7 @@ setup-kafka: _ensure-config
 
 .PHONY: config-update
 # 更新 config
-config-update: config-update-nginx config-update-oracle config-update-mariadb
+config-update: config-update-nginx config-update-app config-update-mariadb
 
 .PHONY: config-update-nginx
 # 更新 nginx 設定：建立帶時間戳的 config，移除符合的既有 config，再掛上新 config
@@ -179,10 +179,10 @@ config-update-nginx:
 	  $(STACK_NAME)_nginx; \
 	echo "==> nginx 設定更新完成"
 
-.PHONY: config-update-oracle
+.PHONY: config-update-app
 # 更新 Oracle 應用設定：建立帶時間戳的 config，更新 api / consumer / scheduler
-config-update-oracle:
-	@CONFIG_PATTERN="$(STACK_NAME)_oracle_config"; \
+config-update-app:
+	@CONFIG_PATTERN="$(STACK_NAME)_app_config"; \
 	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./deploy/config.yaml）"; \
 	docker config create "$$CONFIG_NEW" ./deploy/config.yaml; \
@@ -198,7 +198,7 @@ config-update-oracle:
 	    --config-add source="$$CONFIG_NEW",target=/app/deploy/config.yaml,mode=0444 \
 	    $(STACK_NAME)_$$svc; \
 	done; \
-	echo "==> Oracle 設定更新完成"
+	echo "==> 應用設定更新完成"
 
 .PHONY: config-update-mariadb
 # 更新 MariaDB 設定：建立帶時間戳的 config，更新 mariadb
