@@ -14,8 +14,9 @@ STACK_NAME ?= oracle
 # 映像檔 registry
 IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 
+export
 ########################################################
-# Stack Management
+# Registry Management
 ########################################################
 
 .PHONY: _ensure-registry
@@ -24,38 +25,55 @@ _ensure-registry:
 	aws ecr get-login-password --region ap-east-1 | \
 		docker login --username AWS --password-stdin $(IMAGE_REGISTRY)
 
-.PHONY: deploy
+########################################################
+# Stack Management
+########################################################
+
+.PHONY: deploy deploy-%
 # 部署 stack（IMAGE_REGISTRY、VERSION 會傳入 compose 供 image 使用）
-deploy: _ensure-registry
-	IMAGE_REGISTRY="$(IMAGE_REGISTRY)" VERSION="$(VERSION)" \
-	docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth
+deploy: 
+	@echo "Usage: make deploy-<target>"
+	@echo "Available targets: app, elk, util, monitor"
+	@echo "Example: make deploy-app"
 
-.PHONY: deploy-consul
-# 部署 consul stack
-deploy-consul:
-	CONSUL_SERVER_IP=$(shell ip route get 8.8.8.8 | awk '{print $$7}') \
-	docker stack deploy -c docker-compose.consul.stack.yml consul
+deploy-%:
+	@echo "Deploying $* stack..."
+	@if [ "$*" = "app" ]; then \
+		$(MAKE) _ensure-registry; \
+		docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth; \
+	elif [ "$*" = "elk" ]; then \
+		docker stack deploy -c docker-compose.$*.stack.yml $*; \
+	elif [ "$*" = "util" ]; then \
+		docker stack deploy -c docker-compose.$*.stack.yml $*; \
+	elif [ "$*" = "monitor" ]; then \
+		docker stack deploy -c docker-compose.$*.stack.yml $*; \
+	else \
+		echo "Invalid stack: $*"; \
+		exit 1; \
+	fi;
 
-.PHONY: deploy-elk
-# 部署 elk stack
-deploy-elk:
-	STACK_NAME="$(STACK_NAME)" \
-	docker stack deploy -c docker-compose.elk.stack.yml elk
-
-.PHONY: remove
+.PHONY: remove remove-%
 # 移除 stack
-remove: remove-elk
-	docker stack rm $(STACK_NAME)
+remove:
+	@echo "Usage: make remove-<target>"
+	@echo "Available targets: app, elk, util, monitor"
+	@echo "Example: make remove-app"
 
-.PHONY: remove-elk
-# 移除 elk stack
-remove-elk:
-	docker stack rm elk
-
-.PHONY: remove-consul
-# 移除 consul stack
-remove-consul:
-	docker stack rm consul
+# 移除 stack
+remove-%:
+	@echo "Removing $* stack..."
+	@if [ "$*" = "app" ]; then \
+		docker stack rm $(STACK_NAME); \
+	elif [ "$*" = "elk" ]; then \
+		docker stack rm $*; \
+	elif [ "$*" = "util" ]; then \
+		docker stack rm $*; \
+	elif [ "$*" = "monitor" ]; then \
+		docker stack rm $*; \
+	else \
+		echo "Invalid stack: $*"; \
+		exit 1; \
+	fi;
 
 ########################################################
 # Config
@@ -72,7 +90,7 @@ config: _ensure-registry
 		ts=$$(date +%Y%m%d%H%M%S); \
 		mv ./deploy/config.yaml ./deploy/config.$$ts.yaml && echo "已將原檔移至 deploy/config.$$ts.yaml"; \
 	fi; \
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		config deploy --stdout > ./deploy/config.yaml
 
@@ -82,7 +100,7 @@ _ensure-config: _ensure-registry
 	@if [ ! -f ./deploy/config.yaml ]; then \
 		echo "==> 建立 config"; \
 		mkdir -p ./deploy; \
-		docker run -it --rm \
+		docker run -it --rm --env-file .env \
 			$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 			config deploy --stdout > ./deploy/config.yaml; \
 		echo "==> config 建立完成"; \
@@ -97,7 +115,7 @@ _ensure-config: _ensure-registry
 .PHONY: migrate
 # 遷移資料庫：從本地 deploy/config.yaml 遷移資料庫
 migrate: _ensure-config
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
@@ -114,12 +132,12 @@ setup: migrate setup-cdc setup-kafka
 .PHONY: setup-cdc
 # 設定 CDC
 setup-cdc: _ensure-config 
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		cdc setup db --user root --password $(DB_ROOT_PASSWORD)
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
@@ -128,7 +146,7 @@ setup-cdc: _ensure-config
 .PHONY: setup-kafka
 # 設定 Kafka topic
 setup-kafka: _ensure-config
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
@@ -140,7 +158,7 @@ setup-kafka: _ensure-config
 
 .PHONY: config-update
 # 更新 config
-config-update: config-update-nginx config-update-oracle config-update-mariadb
+config-update: config-update-nginx config-update-app config-update-db
 
 .PHONY: config-update-nginx
 # 更新 nginx 設定：建立帶時間戳的 config，移除符合的既有 config，再掛上新 config
@@ -161,10 +179,10 @@ config-update-nginx:
 	  $(STACK_NAME)_nginx; \
 	echo "==> nginx 設定更新完成"
 
-.PHONY: config-update-oracle
+.PHONY: config-update-app
 # 更新 Oracle 應用設定：建立帶時間戳的 config，更新 api / consumer / scheduler
-config-update-oracle:
-	@CONFIG_PATTERN="$(STACK_NAME)_oracle_config"; \
+config-update-app:
+	@CONFIG_PATTERN="$(STACK_NAME)_app_config"; \
 	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./deploy/config.yaml）"; \
 	docker config create "$$CONFIG_NEW" ./deploy/config.yaml; \
@@ -180,11 +198,11 @@ config-update-oracle:
 	    --config-add source="$$CONFIG_NEW",target=/app/deploy/config.yaml,mode=0444 \
 	    $(STACK_NAME)_$$svc; \
 	done; \
-	echo "==> Oracle 設定更新完成"
+	echo "==> 應用設定更新完成"
 
-.PHONY: config-update-mariadb
-# 更新 MariaDB 設定：建立帶時間戳的 config，更新 mariadb
-config-update-mariadb:
+.PHONY: config-update-db
+# 更新 Database 設定：建立帶時間戳的 config，更新 mariadb
+config-update-db:
 	@CONFIG_PATTERN="$(STACK_NAME)_mariadb_config"; \
 	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/mariadb/mariadb.cnf）"; \
@@ -248,7 +266,7 @@ config-update-logstash:
 	echo "==> Logstash 設定更新完成"
 
 ########################################################
-# Image Update
+# Image Management
 ########################################################
 
 .PHONY: image-update
@@ -269,6 +287,15 @@ image-update: _ensure-registry
 			--update-delay 10s \
 			--with-registry-auth \
 			$(STACK_NAME)_api; \
+
+.PHONY: image-version
+# 顯示 image 版本
+image-version:
+	docker run -it --rm --env-file .env \
+		--network $(STACK_NAME)_backend_network \
+		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
+		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
+		--version;
 
 ########################################################
 # Node Management
@@ -310,10 +337,10 @@ stack-tasks:
 .PHONY: shell
 # 建立 shell 進入 stack 內部
 shell: _ensure-registry
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--user root \
-		--network $(STACK_NAME)_backend_network \
 		--entrypoint "/bin/sh" \
+		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		-c "apk add curl bash vim \

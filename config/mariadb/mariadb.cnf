@@ -1,4 +1,73 @@
+# MariaDB 10.11 – production-oriented settings
+# Mounted as /etc/mysql/conf.d/mariadb.cnf in container
+
 [mysqld]
+# -----------------------------------------------------------------------------
+# Binlog (required for CDC / Debezium)
+# -----------------------------------------------------------------------------
 log-bin=mysql-bin
 binlog_format=ROW
 binlog_row_image=FULL
+server-id=1
+# Expire binlog after 7 days to avoid disk fill (MariaDB 10.6+)
+binlog_expire_logs_seconds=604800
+
+# -----------------------------------------------------------------------------
+# Character set & collation
+# -----------------------------------------------------------------------------
+character-set-server=utf8mb4
+collation-server=utf8mb4_unicode_ci
+
+# -----------------------------------------------------------------------------
+# Connections & timeouts
+# -----------------------------------------------------------------------------
+max_connections=500
+max_connect_errors=100000
+wait_timeout=600
+interactive_timeout=600
+max_allowed_packet=64M
+
+# -----------------------------------------------------------------------------
+# Durability (ACID, recommended for production)
+# -----------------------------------------------------------------------------
+innodb_flush_log_at_trx_commit=1
+sync_binlog=1
+
+# -----------------------------------------------------------------------------
+# InnoDB buffer & performance
+# Tuned for ~32GB host (e.g. igaming-prd-dbm-01). For ~16GB use buffer_pool=8G–10G, log_file=256M.
+# Rule of thumb: buffer_pool ~50–70% of dedicated DB host RAM.
+# -----------------------------------------------------------------------------
+innodb_buffer_pool_size=18G
+innodb_log_file_size=512M
+innodb_log_buffer_size=64M
+innodb_file_per_table=1
+innodb_flush_method=O_DIRECT
+
+# -----------------------------------------------------------------------------
+# Security & behaviour
+# -----------------------------------------------------------------------------
+# Avoid DNS lookups for connections (faster, no reverse-DNS dependency)
+skip-name-resolve
+# Disable local infile for security
+local-infile=0
+
+# -----------------------------------------------------------------------------
+# Slow query log (tune long_query_time as needed)
+# -----------------------------------------------------------------------------
+slow_query_log=1
+long_query_time=2
+log_queries_not_using_indexes=0
+
+# -----------------------------------------------------------------------------
+# Optional: default transaction isolation (app-dependent)
+# -----------------------------------------------------------------------------
+# transaction_isolation=READ-COMMITTED
+
+[mysqldump]
+quick
+quote-names
+max_allowed_packet=64M
+
+[mysql]
+default-character-set=utf8mb4
