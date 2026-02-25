@@ -62,7 +62,7 @@ x-oracle-services: &oracle-services
     MONGODB_PASSWORD: ${MONGODB_PASSWORD:-oracle_password}
     MONGODB_AUTH_SOURCE: ${MONGODB_AUTH_SOURCE:-admin}
   configs:
-    - source: oracle_config
+    - source: app_config
       target: /app/deploy/config.yaml
       mode: 0444
   networks:
@@ -569,7 +569,7 @@ configs:
     file: ./config/nginx/oracle.conf
   nginx_log_format_config:
     file: ./config/nginx/log_format.conf
-  oracle_config:
+  app_config:
     file: ./deploy/config.yaml
   mariadb_config:
     file: ./config/mariadb/mariadb.cnf
