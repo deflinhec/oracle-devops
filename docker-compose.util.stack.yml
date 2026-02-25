@@ -93,7 +93,7 @@ services:
     image: mongo-express:1.0.2-20-alpine3.19
     environment:
       TZ: Asia/Taipei
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGODB_USERNAME:-oracle}:${MONGODB_PASSWORD:-oracle_password}@mongodb:27017/${MONGODB_DATABASE:-oracle_mdb}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGODB_USERNAME:-oracle}:${MONGODB_PASSWORD:-oracle_password}@mongodb:27017/${MONGODB_DATABASE:-oracle_mdb}?authSource=admin
       ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME:-admin}
       ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin}
     deploy:
@@ -115,7 +115,6 @@ services:
       - util_network
       - oracle_network
     healthcheck:
-      # Basic auth is enabled; pass credentials so 401 doesn't fail the check
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8081'"]
       interval: 30s
       timeout: 10s
