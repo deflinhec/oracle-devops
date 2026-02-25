@@ -15,7 +15,7 @@ STACK_NAME ?= oracle
 IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 
 ########################################################
-# Stack Management
+# Registry Management
 ########################################################
 
 .PHONY: _ensure-registry
@@ -24,40 +24,56 @@ _ensure-registry:
 	aws ecr get-login-password --region ap-east-1 | \
 		docker login --username AWS --password-stdin $(IMAGE_REGISTRY)
 
-.PHONY: deploy
+########################################################
+# Stack Management
+########################################################
+
+.PHONY: deploy deploy-%
 # 部署 stack（IMAGE_REGISTRY、VERSION 會傳入 compose 供 image 使用）
-deploy: _ensure-registry
-	IMAGE_REGISTRY="$(IMAGE_REGISTRY)" VERSION="$(VERSION)" \
-	docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth
+deploy: 
+	@echo "Usage: make deploy-<target>"
+	@echo "Available targets: app, elk, util, monitor"
+	@echo "Example: make deploy-app"
 
+deploy-%:
+	@echo "Deploying $* stack..."
+	@if [ "$*" = "app" ]; then \
+		$(MAKE) _ensure-registry; \
+		IMAGE_REGISTRY="$(IMAGE_REGISTRY)" VERSION="$(VERSION)" \
+		docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth; \
+	elif [ "$*" = "elk" ]; then \
+		docker stack deploy -c docker-compose.$*.stack.yml $*; \
+	elif [ "$*" = "util" ]; then \
+		docker stack deploy -c docker-compose.$*.stack.yml $*; \
+	elif [ "$*" = "monitor" ]; then \
+		docker stack deploy -c docker-compose.$*.stack.yml $*; \
+	else \
+		echo "Invalid stack: $*"; \
+		exit 1; \
+	fi;
 
-.PHONY: deploy-elk
-# 部署 elk stack
-deploy-elk:
-	STACK_NAME="$(STACK_NAME)" \
-	docker stack deploy -c docker-compose.elk.stack.yml elk
-
-
-.PHONY: deploy-util
-# 部署 util stack
-deploy-util:
-	STACK_NAME="$(STACK_NAME)" \
-	docker stack deploy -c docker-compose.util.stack.yml util
-
-.PHONY: remove
+.PHONY: remove remove-%
 # 移除 stack
-remove: remove-elk remove-util
-	docker stack rm $(STACK_NAME)
+remove:
+	@echo "Usage: make remove-<target>"
+	@echo "Available targets: app, elk, util, monitor"
+	@echo "Example: make remove-app"
 
-.PHONY: remove-elk
-# 移除 elk stack
-remove-elk:
-	docker stack rm elk
-
-.PHONY: remove-util
-# 移除 util stack
-remove-util:
-	docker stack rm util
+# 移除 stack
+remove-%:
+	@echo "Removing $* stack..."
+	@if [ "$*" = "app" ]; then \
+		docker stack rm $(STACK_NAME); \
+	elif [ "$*" = "elk" ]; then \
+		docker stack rm $*; \
+	elif [ "$*" = "util" ]; then \
+		docker stack rm $*; \
+	elif [ "$*" = "monitor" ]; then \
+		docker stack rm $*; \
+	else \
+		echo "Invalid stack: $*"; \
+		exit 1; \
+	fi;
 
 ########################################################
 # Config
@@ -74,7 +90,7 @@ config: _ensure-registry
 		ts=$$(date +%Y%m%d%H%M%S); \
 		mv ./deploy/config.yaml ./deploy/config.$$ts.yaml && echo "已將原檔移至 deploy/config.$$ts.yaml"; \
 	fi; \
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		config deploy --stdout > ./deploy/config.yaml
 
@@ -84,7 +100,7 @@ _ensure-config: _ensure-registry
 	@if [ ! -f ./deploy/config.yaml ]; then \
 		echo "==> 建立 config"; \
 		mkdir -p ./deploy; \
-		docker run -it --rm \
+		docker run -it --rm --env-file .env \
 			$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 			config deploy --stdout > ./deploy/config.yaml; \
 		echo "==> config 建立完成"; \
@@ -99,7 +115,7 @@ _ensure-config: _ensure-registry
 .PHONY: migrate
 # 遷移資料庫：從本地 deploy/config.yaml 遷移資料庫
 migrate: _ensure-config
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
@@ -116,12 +132,12 @@ setup: migrate setup-cdc setup-kafka
 .PHONY: setup-cdc
 # 設定 CDC
 setup-cdc: _ensure-config 
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		cdc setup db --user root --password $(DB_ROOT_PASSWORD)
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
@@ -130,7 +146,7 @@ setup-cdc: _ensure-config
 .PHONY: setup-kafka
 # 設定 Kafka topic
 setup-kafka: _ensure-config
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
