@@ -158,7 +158,7 @@ setup-kafka: _ensure-config
 
 .PHONY: config-update
 # 更新 config
-config-update: config-update-nginx config-update-app config-update-mariadb
+config-update: config-update-nginx config-update-app config-update-db
 
 .PHONY: config-update-nginx
 # 更新 nginx 設定：建立帶時間戳的 config，移除符合的既有 config，再掛上新 config
@@ -200,9 +200,9 @@ config-update-app:
 	done; \
 	echo "==> 應用設定更新完成"
 
-.PHONY: config-update-mariadb
-# 更新 MariaDB 設定：建立帶時間戳的 config，更新 mariadb
-config-update-mariadb:
+.PHONY: config-update-db
+# 更新 Database 設定：建立帶時間戳的 config，更新 mariadb
+config-update-db:
 	@CONFIG_PATTERN="$(STACK_NAME)_mariadb_config"; \
 	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/mariadb/mariadb.cnf）"; \
@@ -266,7 +266,7 @@ config-update-logstash:
 	echo "==> Logstash 設定更新完成"
 
 ########################################################
-# Image Update
+# Image Management
 ########################################################
 
 .PHONY: image-update
@@ -287,6 +287,15 @@ image-update: _ensure-registry
 			--update-delay 10s \
 			--with-registry-auth \
 			$(STACK_NAME)_api; \
+
+.PHONY: image-version
+# 顯示 image 版本
+image-version:
+	docker run -it --rm --env-file .env \
+		--network $(STACK_NAME)_backend_network \
+		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
+		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
+		--version;
 
 ########################################################
 # Node Management
@@ -328,10 +337,10 @@ stack-tasks:
 .PHONY: shell
 # 建立 shell 進入 stack 內部
 shell: _ensure-registry
-	docker run -it --rm \
+	docker run -it --rm --env-file .env \
 		--user root \
-		--network $(STACK_NAME)_backend_network \
 		--entrypoint "/bin/sh" \
+		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
 		$(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 		-c "apk add curl bash vim \
