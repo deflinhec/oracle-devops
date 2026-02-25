@@ -410,14 +410,14 @@ services:
       - -c
       - |
         set -e
-        mkdir -p /host/var/www
+        mkdir -p /rootfs/var/www
         # 1000 for ubuntu user, 33 for www-data group
-        chown -R 1000:33 /host/var/www || true
+        chown -R 1000:33 /rootfs/var/www || true
         # www-data can read and execute, but not write
-        chmod -R 2755 /host/var/www
+        chmod -R 2755 /rootfs/var/www
         echo "prepared on $$(hostname)"
     volumes:
-      - /:/host
+      - /:/rootfs
     deploy:
       mode: global
       restart_policy:
