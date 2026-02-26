@@ -25,44 +25,44 @@ x-oracle-services: &oracle-services
   environment:
     TZ: Asia/Taipei
     # Logging
-    LOG_LEVEL: info
-    LOG_ENCODING: json
-    LOG_OUTPUT_PATHS: stdout
-    LOG_ERROR_OUTPUT_PATHS: stderr
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    LOG_ENCODING: ${LOG_ENCODING:-json}
+    LOG_OUTPUT_PATHS: ${LOG_OUTPUT_PATHS:-stdout}
+    LOG_ERROR_OUTPUT_PATHS: ${LOG_ERROR_OUTPUT_PATHS:-stderr}
     # Database
-    DB_HOST: mariadb
-    DB_PORT: 3306
+    DB_HOST: ${DB_HOST:-mariadb}
+    DB_PORT: ${DB_PORT:-3306}
     DB_DATABASE: ${DB_DATABASE:-oracle_db}
     DB_USERNAME: ${DB_USERNAME:-oracle}
     DB_PASSWORD: ${DB_PASSWORD:-oracle_password}
     # Redis
-    REDIS_HOST: redis
-    REDIS_PORT: 6379
+    REDIS_HOST: ${REDIS_HOST:-redis}
+    REDIS_PORT: ${REDIS_PORT:-6379}
     # Kafka brokers
-    KAFKA_BROKERS: kafka01:9092,kafka02:9092,kafka03:9092
+    KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka01:9092,kafka02:9092,kafka03:9092}
     # Kafka Connect
-    KAFKA_CONNECT_URL: http://kafka-connect:8083
-    KAFKA_CONNECT_SERVER_ID: 1
-    KAFKA_CONNECT_BROKERS: kafka01:9092,kafka02:9092,kafka03:9092
-    KAFKA_CONNECT_DATABASE_HOST: mariadb
-    KAFKA_CONNECT_DATABASE_PORT: 3306
-    KAFKA_CONNECT_DATABASE_USERNAME: ${DB_USERNAME:-oracle}
-    KAFKA_CONNECT_DATABASE_PASSWORD: ${DB_PASSWORD:-oracle_password}
+    KAFKA_CONNECT_URL: ${KAFKA_CONNECT_URL:-http://kafka-connect:8083}
+    KAFKA_CONNECT_SERVER_ID: ${KAFKA_CONNECT_SERVER_ID:-1}
+    KAFKA_CONNECT_BROKERS: ${KAFKA_CONNECT_BROKERS:-kafka01:9092,kafka02:9092,kafka03:9092}
+    KAFKA_CONNECT_DATABASE_HOST: ${KAFKA_CONNECT_DATABASE_HOST:-mariadb}
+    KAFKA_CONNECT_DATABASE_PORT: ${KAFKA_CONNECT_DATABASE_PORT:-3306}
+    KAFKA_CONNECT_DATABASE_USERNAME: ${KAFKA_CONNECT_DATABASE_USERNAME:-connect}
+    KAFKA_CONNECT_DATABASE_PASSWORD: ${KAFKA_CONNECT_DATABASE_PASSWORD:-connect_password}
     # ClickHouse
-    CLICKHOUSE_HOST: clickhouse
-    CLICKHOUSE_PORT: 9000
+    CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+    CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-9000}
     CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-oracle_analytics}
     CLICKHOUSE_USERNAME: ${CLICKHOUSE_USERNAME:-oracle}
     CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-oracle_password}
     # MongoDB
-    MONGODB_HOST: mongodb
-    MONGODB_PORT: 27017
+    MONGODB_HOST: ${MONGODB_HOST:-mongodb}
+    MONGODB_PORT: ${MONGODB_PORT:-27017}
     MONGODB_DATABASE: ${MONGODB_DATABASE:-oracle_mdb}
     MONGODB_USERNAME: ${MONGODB_USERNAME:-oracle}
     MONGODB_PASSWORD: ${MONGODB_PASSWORD:-oracle_password}
-    MONGODB_AUTH_SOURCE: admin
+    MONGODB_AUTH_SOURCE: ${MONGODB_AUTH_SOURCE:-admin}
   configs:
-    - source: oracle_config
+    - source: app_config
       target: /app/deploy/config.yaml
       mode: 0444
   networks:
@@ -230,9 +230,9 @@ services:
         protocol: tcp
         mode: ingress
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-oracle}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-oracle_password}
-      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-oracle_mdb}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME:-oracle}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-oracle_password}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE:-oracle_mdb}
       TZ: Asia/Taipei
     volumes:
       - mongodb_data:/data/db
@@ -271,8 +271,8 @@ services:
         protocol: tcp
         mode: ingress
     environment:
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-oracle_analytics}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-oracle}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-oracle_analytics}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USERNAME:-oracle}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-oracle_password}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       TZ: Asia/Taipei
@@ -359,10 +359,10 @@ services:
     environment:
       TZ: Asia/Taipei
       BOOTSTRAP_SERVERS: kafka01:9092,kafka02:9092,kafka03:9092
-      GROUP_ID: oracle-connect-cluster
-      CONFIG_STORAGE_TOPIC: connect-configs
-      OFFSET_STORAGE_TOPIC: connect-offsets
-      STATUS_STORAGE_TOPIC: connect-status
+      GROUP_ID: connect
+      CONFIG_STORAGE_TOPIC: __connect-configs
+      OFFSET_STORAGE_TOPIC: __connect-offsets
+      STATUS_STORAGE_TOPIC: __connect-status
       CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 3
       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 3
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 3
@@ -399,6 +399,33 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
+
+  # =========================
+  # Prepare Node
+  # =========================
+  prepare:
+    image: alpine:3.19
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        mkdir -p /rootfs/var/www
+        # 1000 for ubuntu user, 33 for www-data group
+        chown -R 1000:33 /rootfs/var/www || true
+        # www-data can read and execute, but not write
+        chmod -R 2755 /rootfs/var/www
+        echo "prepared on $$(hostname)"
+    volumes:
+      - /:/rootfs
+    deploy:
+      mode: global
+      restart_policy:
+        condition: none
+      placement:
+        constraints:
+          # docker command: docker node update --label-add role.web=true <node_id>
+          - node.labels.role.web == true
 
   # =========================
   # Nginx Load Balancer
@@ -542,7 +569,7 @@ configs:
     file: ./config/nginx/oracle.conf
   nginx_log_format_config:
     file: ./config/nginx/log_format.conf
-  oracle_config:
+  app_config:
     file: ./deploy/config.yaml
   mariadb_config:
     file: ./config/mariadb/mariadb.cnf

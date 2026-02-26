@@ -1,0 +1,52 @@
+{
+  "folders": {},
+  "connections": {
+    "mariadb-oracle": {
+      "provider": "mariadb",
+      "driver": "mariadb",
+      "name": "Oracle DB",
+      "save-password": true,
+      "show-system-objects": true,
+      "template": true,
+      "configuration": {
+        "host": "${DB_HOST:-mariadb}",
+        "port": "${DB_PORT:-3306}",
+        "url": "jdbc:mariadb://${DB_HOST:-mariadb}:${DB_PORT:-3306}/${DB_DATABASE}",
+        "user": "${DB_USERNAME}",
+        "password": "${DB_PASSWORD}",
+        "configurationType": "MANUAL",
+        "type": "dev",
+        "closeIdleConnection": true
+      } 
+    },
+    "clickhouse-oracle": {
+      "provider": "clickhouse",
+      "driver": "com_clickhouse",
+      "name": "Oracle ClickHouse",
+      "save-password": true,
+      "show-system-objects": true,
+      "template": true,
+      "configuration": {
+        "host": "${CLICKHOUSE_HOST:-clickhouse}",
+        "port": "${CLICKHOUSE_PORT:-8123}",
+        "url": "jdbc:clickhouse://${CLICKHOUSE_HOST:-clickhouse}:${CLICKHOUSE_PORT:-8123}/${CLICKHOUSE_DATABASE}",
+        "user": "${CLICKHOUSE_USERNAME}",
+        "password": "${CLICKHOUSE_PASSWORD}",
+        "configurationType": "MANUAL",
+        "type": "dev",
+        "closeIdleConnection": true
+      }
+    }
+  },
+  "connection-types": {
+    "dev": {
+      "name": "Development",
+      "color": "255,255,255",
+      "description": "Regular development database",
+      "auto-commit": true,
+      "confirm-execute": false,
+      "confirm-data-change": false,
+      "auto-close-transactions": false
+    }
+  }
+}
