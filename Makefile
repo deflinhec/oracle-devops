@@ -5,6 +5,9 @@
 # 載入 .env 檔案
 -include .env
 
+# Nginx 埠
+NGINX_PORT ?= 80
+
 # 映像檔 reference
 VERSION ?= develop
 
