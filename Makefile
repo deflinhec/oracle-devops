@@ -15,13 +15,23 @@ STACK_NAME ?= oracle
 IMAGE_REGISTRY ?= 480126395291.dkr.ecr.ap-east-1.amazonaws.com/igaming/
 
 export
+
+########################################################
+# Help
+########################################################
+.PHONY: help
+help: ## 顯示此說明訊息
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Available targets:'
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-26s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
 ########################################################
 # Registry Management
 ########################################################
 
 .PHONY: _ensure-registry
-# 確保 registry 已登入
-_ensure-registry:
+_ensure-registry: # 確保 registry 已登入（ECR）
 	aws ecr get-login-password --region ap-east-1 | \
 		docker login --username AWS --password-stdin $(IMAGE_REGISTRY)
 
@@ -29,59 +39,62 @@ _ensure-registry:
 # Stack Management
 ########################################################
 
-.PHONY: deploy deploy-%
-# 部署 stack（IMAGE_REGISTRY、VERSION 會傳入 compose 供 image 使用）
-deploy: 
-	@echo "Usage: make deploy-<target>"
-	@echo "Available targets: app, elk, util, monitor"
-	@echo "Example: make deploy-app"
+.PHONY: deploy deploy-% deploy-app deploy-elk deploy-util deploy-monitor
+deploy: deploy-app deploy-elk deploy-util deploy-monitor ## 部署全部 stack（app, elk, util, monitor）
 
-deploy-%:
-	@echo "Deploying $* stack..."
-	@if [ "$*" = "app" ]; then \
-		$(MAKE) _ensure-registry; \
-		docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth; \
-	elif [ "$*" = "elk" ]; then \
-		docker stack deploy -c docker-compose.$*.stack.yml $*; \
-	elif [ "$*" = "util" ]; then \
-		docker stack deploy -c docker-compose.$*.stack.yml $*; \
-	elif [ "$*" = "monitor" ]; then \
-		docker stack deploy -c docker-compose.$*.stack.yml $*; \
-	else \
-		echo "Invalid stack: $*"; \
-		exit 1; \
-	fi;
+deploy-app: _ensure-registry ## 部署 app stack（$(STACK_NAME)）
+	@echo "Deploying app stack..."
+	@docker stack deploy -c docker-compose.stack.yml $(STACK_NAME) --with-registry-auth
 
-.PHONY: remove remove-%
-# 移除 stack
-remove:
-	@echo "Usage: make remove-<target>"
-	@echo "Available targets: app, elk, util, monitor"
-	@echo "Example: make remove-app"
+deploy-elk: ## 部署 elk stack
+	@echo "Deploying elk stack..."
+	@docker stack deploy -c docker-compose.elk.stack.yml elk
 
-# 移除 stack
-remove-%:
-	@echo "Removing $* stack..."
-	@if [ "$*" = "app" ]; then \
-		docker stack rm $(STACK_NAME); \
-	elif [ "$*" = "elk" ]; then \
-		docker stack rm $*; \
-	elif [ "$*" = "util" ]; then \
-		docker stack rm $*; \
-	elif [ "$*" = "monitor" ]; then \
-		docker stack rm $*; \
-	else \
-		echo "Invalid stack: $*"; \
-		exit 1; \
-	fi;
+deploy-util: ## 部署 util stack
+	@echo "Deploying util stack..."
+	@docker stack deploy -c docker-compose.util.stack.yml util
+
+deploy-monitor: ## 部署 monitor stack
+	@echo "Deploying monitor stack..."
+	@docker stack deploy -c docker-compose.monitor.stack.yml monitor
+
+deploy-%: ## 部署指定 stack（make deploy-app | deploy-elk | deploy-util | deploy-monitor）
+	@case "$*" in \
+		app|elk|util|monitor) $(MAKE) deploy-$* ;; \
+		*) echo "Invalid stack: $*. Available: app, elk, util, monitor"; exit 1 ;; \
+	esac
+
+.PHONY: remove remove-% remove-app remove-elk remove-util remove-monitor
+remove: remove-monitor remove-util remove-elk remove-app ## 移除全部 stack（reverse order: monitor, util, elk, app）
+
+remove-app: ## 移除 app stack（$(STACK_NAME)）
+	@echo "Removing app stack..."
+	@docker stack rm $(STACK_NAME)
+
+remove-elk: ## 移除 elk stack
+	@echo "Removing elk stack..."
+	@docker stack rm elk
+
+remove-util: ## 移除 util stack
+	@echo "Removing util stack..."
+	@docker stack rm util
+
+remove-monitor: ## 移除 monitor stack
+	@echo "Removing monitor stack..."
+	@docker stack rm monitor
+
+remove-%: ## 移除指定 stack
+	@case "$*" in \
+		app|elk|util|monitor) $(MAKE) remove-$* ;; \
+		*) echo "Invalid stack: $*. Available: app, elk, util, monitor"; exit 1 ;; \
+	esac
 
 ########################################################
 # Config
 ########################################################
 
 .PHONY: config
-# 部署應用設定：從映像檔中部署應用設定到本地 deploy/config.yaml（若已存在會先詢問，同意後改名为 config.<datetime>.yaml）
-config: _ensure-registry
+config: _ensure-registry ## 部署應用設定至 deploy/config.yaml（從映像檔取得，若已存在會詢問覆寫）
 	mkdir -p ./deploy
 	@if [ -f ./deploy/config.yaml ]; then \
 		printf 'deploy/config.yaml 已存在，是否覆寫？ [y/N] '; \
@@ -95,8 +108,7 @@ config: _ensure-registry
 		config deploy --stdout > ./deploy/config.yaml
 
 .PHONY: _ensure-config
-# 確保 config 存在
-_ensure-config: _ensure-registry
+_ensure-config: _ensure-registry # 確保 deploy/config.yaml 存在（內部用）
 	@if [ ! -f ./deploy/config.yaml ]; then \
 		echo "==> 建立 config"; \
 		mkdir -p ./deploy; \
@@ -113,8 +125,7 @@ _ensure-config: _ensure-registry
 ########################################################
 
 .PHONY: migrate
-# 遷移資料庫：從本地 deploy/config.yaml 遷移資料庫
-migrate: _ensure-config
+migrate: _ensure-config ## 從 deploy/config.yaml 遷移資料庫
 	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
@@ -126,12 +137,10 @@ migrate: _ensure-config
 ########################################################
 
 .PHONY: setup
-# 設定 CDC 與 Kafka topic
-setup: migrate setup-cdc setup-kafka
+setup: migrate setup-cdc setup-kafka ## 執行 migrate、CDC 與 Kafka 設定
 
 .PHONY: setup-cdc
-# 設定 CDC
-setup-cdc: _ensure-config 
+setup-cdc: _ensure-config ## 設定 CDC（DB + Debezium） 
 	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
@@ -144,8 +153,7 @@ setup-cdc: _ensure-config
 		cdc setup debezium
 
 .PHONY: setup-kafka
-# 設定 Kafka topic
-setup-kafka: _ensure-config
+setup-kafka: _ensure-config ## 設定 Kafka topic
 	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
@@ -156,13 +164,17 @@ setup-kafka: _ensure-config
 # 更新 config
 ########################################################
 
-.PHONY: config-update
-# 更新 config
-config-update: config-update-nginx config-update-app config-update-db
+.PHONY: config-update config-update-%
+config-update: config-update-app config-update-nginx config-update-db ## 更新 nginx、應用、DB 的 Docker config
+
+config-update-%: ## 更新指定 config（make config-update-nginx | app | db | elk | filebeat | logstash）
+	@case "$*" in \
+		nginx|app|db|elk|filebeat|logstash) $(MAKE) config-update-$* ;; \
+		*) echo "Invalid config-update target: $*. Available: nginx, app, db, elk, filebeat, logstash"; exit 1 ;; \
+	esac
 
 .PHONY: config-update-nginx
-# 更新 nginx 設定：建立帶時間戳的 config，移除符合的既有 config，再掛上新 config
-config-update-nginx:
+config-update-nginx: ## 更新 nginx 設定（建立帶時間戳的 config 並掛到服務）
 	@CONFIG_PATTERN="$(STACK_NAME)_nginx_config"; \
 	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/nginx/oracle.conf）"; \
@@ -180,8 +192,7 @@ config-update-nginx:
 	echo "==> nginx 設定更新完成"
 
 .PHONY: config-update-app
-# 更新 Oracle 應用設定：建立帶時間戳的 config，更新 api / consumer / scheduler
-config-update-app:
+config-update-app: ## 更新 Oracle 應用設定（api / consumer / scheduler）
 	@CONFIG_PATTERN="$(STACK_NAME)_app_config"; \
 	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./deploy/config.yaml）"; \
@@ -201,8 +212,7 @@ config-update-app:
 	echo "==> 應用設定更新完成"
 
 .PHONY: config-update-db
-# 更新 Database 設定：建立帶時間戳的 config，更新 mariadb
-config-update-db:
+config-update-db: ## 更新 MariaDB 設定（Docker config）
 	@CONFIG_PATTERN="$(STACK_NAME)_mariadb_config"; \
 	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/mariadb/mariadb.cnf）"; \
@@ -224,12 +234,10 @@ config-update-db:
 ########################################################
 
 .PHONY: config-update-elk
-# 更新 elk 設定：更新 filebeat / logstash
-config-update-elk: config-update-filebeat config-update-logstash
+config-update-elk: config-update-filebeat config-update-logstash ## 更新 ELK 設定（filebeat + logstash）
 
 .PHONY: config-update-filebeat
-# 更新 filebeat 設定：建立帶時間戳的 config，更新 filebeat
-config-update-filebeat:
+config-update-filebeat: ## 更新 Filebeat 設定（Docker config）
 	@CONFIG_PATTERN="elk_filebeat_config"; \
 	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/filebeat/filebeat.yml）"; \
@@ -247,8 +255,7 @@ config-update-filebeat:
 	echo "==> Filebeat 設定更新完成"
 
 .PHONY: config-update-logstash
-# 更新 logstash 設定：建立帶時間戳的 config，更新 logstash
-config-update-logstash:
+config-update-logstash: ## 更新 Logstash 設定（Docker config）
 	@CONFIG_PATTERN="elk_logstash_config"; \
 	CONFIG_NEW="$${CONFIG_PATTERN}_$$(date +%Y%m%d%H%M%S)"; \
 	echo "==> 建立 config $$CONFIG_NEW（來源：./config/logstash/logstash.conf）"; \
@@ -270,8 +277,7 @@ config-update-logstash:
 ########################################################
 
 .PHONY: image-update
-# 更新 image
-image-update: _ensure-registry
+image-update: _ensure-registry ## 更新 stack 內 app 服務的 image 版本（consumer, scheduler, api）
 	docker service update \
 			--image $(IMAGE_REGISTRY)oracle/app:$(VERSION) \
 			--with-registry-auth \
@@ -289,8 +295,7 @@ image-update: _ensure-registry
 			$(STACK_NAME)_api; \
 
 .PHONY: image-version
-# 顯示 image 版本
-image-version:
+image-version: ## 顯示 app image 版本
 	docker run -it --rm --env-file .env \
 		--network $(STACK_NAME)_backend_network \
 		-v $(PWD)/deploy/config.yaml:/app/deploy/config.yaml \
@@ -302,19 +307,16 @@ image-version:
 ########################################################
 
 .PHONY: node-list
-# 列出所有節點的 label
-node-list:
+node-list: ## 列出所有節點的 label
 	docker node ls -q | xargs -I {} docker node inspect {} \
 		--format '{{ .Description.Hostname }} -> {{ .Spec.Labels }}'
 
 .PHONY: node-label-add
-# 為節點加上 label
-node-label-add:
+node-label-add: ## 為節點加上 label（用法：make node-label-add key=value NODE_ID）
 	docker node update --label-add $1 $2
 
 .PHONY: node-label-remove
-# 為節點移除 label
-node-label-remove:
+node-label-remove: ## 為節點移除 label（用法：make node-label-remove key NODE_ID）
 	docker node update --label-rm $1 $2
 
 ########################################################
@@ -322,21 +324,18 @@ node-label-remove:
 ########################################################
 
 .PHONY: stack-services
-# 列出 stack 內所有服務
-stack-services:
+stack-services: ## 列出 stack 內所有服務
 	docker stack services $(STACK_NAME)
 
 .PHONY: stack-tasks
-# 列出 stack 內所有 task
-stack-tasks:
+stack-tasks: ## 列出 stack 內所有 task
 	docker stack ps $(STACK_NAME)
 
 ########################################################
 # Shell
 ########################################################
 .PHONY: shell
-# 建立 shell 進入 stack 內部
-shell: _ensure-registry
+shell: _ensure-registry ## 建立 shell 進入 stack 網路內（掛載 deploy/config.yaml，含 curl/bash/vim）
 	docker run -it --rm --env-file .env \
 		--user root \
 		--entrypoint "/bin/sh" \
