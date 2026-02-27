@@ -123,11 +123,12 @@ docker node update --label-add role.scheduler=true   $NODE_ID
 
 ### 四、建立靜態網頁掛載目錄
 
-Nginx 會掛載主機的 `/var/www` 作為靜態資源目錄。凡具備 **`role.web=true`** label 的節點，須事先建立此目錄，否則 Nginx 容器無法啟動；此目錄後續由 **GitLab CI/CD** 部署靜態網頁。
+Nginx 會掛載主機的 `/var/www` 作為靜態資源目錄。凡具備 **`role.web=true`** label 的節點，須事先建立此目錄，否則 Nginx 容器無法啟動；此目錄後續由 **GitLab CI/CD** 部署靜態網頁。並需在該主機上將 `ubuntu` 使用者加入 `www-data` 群組，以便部署與權限一致。
 
 ```bash
 # 在每個 web 節點上執行
 sudo mkdir -p /var/www/
+sudo usermod -aG www-data ubuntu
 ```
 
 ### 五、部署 Stack
